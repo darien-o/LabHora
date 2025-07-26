@@ -51,9 +51,9 @@ export default function ClockTracker() {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [activeTab, setActiveTab] = useState("clock")
 
-  // Update current time every minute (not every second)
+  // Update current time every second for real-time clock
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000)
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
 
@@ -89,12 +89,12 @@ export default function ClockTracker() {
         throw new Error(data.error)
       }
 
-      console.log("People loaded:", data.length, "Active person:", data.find((p) => p.isActive)?.name || "None")
+      console.log("People loaded:", data.length, "Active person:", data.find((person: Person) => person.isActive)?.name || "None")
       setPeople(data)
 
       // Update selected person if they exist in the new data
       if (selectedPerson) {
-        const updatedPerson = data.find((p: Person) => p.name === selectedPerson.name)
+        const updatedPerson = data.find((person: Person) => person.name === selectedPerson.name)
         if (updatedPerson) {
           setSelectedPerson(updatedPerson)
         }
@@ -152,6 +152,18 @@ export default function ClockTracker() {
       .map((n) => n[0])
       .join("")
       .toUpperCase()
+  }
+
+  // Helper to parse Spanish date string "DD/MM/YYYY, HH:mm:ss" to Date object
+  const parseSpanishDateTime = (dateTimeStr: string): Date | null => {
+    try {
+      const [datePart, timePart] = dateTimeStr.split(", ")
+      const [day, month, year] = datePart.split("/").map(Number)
+      const [hours, minutes, seconds] = timePart.split(":").map(Number)
+      return new Date(year, month - 1, day, hours, minutes, seconds)
+    } catch {
+      return null
+    }
   }
 
   const formatTime = (date: Date) => {
@@ -374,10 +386,15 @@ export default function ClockTracker() {
                     </div>
                     <div className="flex-1">
                       <p className="font-bold text-green-800 text-lg">{activePerson.name}</p>
-                      <p className="text-sm text-green-600">
-                        Fichado desde las{" "}
-                        {activePerson.lastClockIn ? formatTime(new Date(activePerson.lastClockIn)) : "Desconocido"}
-                      </p>
+            <p className="text-sm text-green-600">
+              Fichado desde las{" "}
+              {activePerson.lastClockIn
+                ? (() => {
+                    const parsedDate = parseSpanishDateTime(activePerson.lastClockIn)
+                    return parsedDate ? formatTime(parsedDate) : "Fecha inválida"
+                  })()
+                : "Desconocido"}
+            </p>
                     </div>
                     <Badge className="bg-green-100 text-green-800 border-green-300">ACTIVO</Badge>
                   </div>
