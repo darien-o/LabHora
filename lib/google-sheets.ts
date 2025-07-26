@@ -116,6 +116,9 @@ export async function getTimeEntries(): Promise<TimeEntry[]> {
     })
 
     const rows = response.data.values || []
+    console.log("Raw rows length from sheet:", rows.length)
+    console.log("Raw rows data:", rows)
+
     if (rows.length <= 1) {
       console.log("No time entries found in sheet")
       return [] // Return empty array
@@ -123,6 +126,9 @@ export async function getTimeEntries(): Promise<TimeEntry[]> {
 
     // Skip header row if it exists and filter valid rows
     const dataRows = rows.slice(1).filter((row) => row.length > 0 && row[0] && row[2])
+
+    console.log("Filtered data rows length:", dataRows.length)
+    console.log("Filtered data rows:", dataRows)
 
     return dataRows.map((row, index) => ({
       id: `entry-${index}-${Date.now()}`, // Unique ID
