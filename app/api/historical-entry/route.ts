@@ -12,7 +12,11 @@ export async function POST(request: Request) {
     // Verificar conflictos
     const hasConflicts = await checkTimeConflicts(personName, clockIn, clockOut)
     if (hasConflicts) {
-      return NextResponse.json({ error: "Este horario se solapa con un registro existente" }, { status: 400 })
+      // Get detailed conflict message
+      const conflictDetails = await import("@/lib/google-sheets").then(mod =>
+        mod.getConflictDetails(personName, clockIn, clockOut)
+      )
+      return NextResponse.json({ error: conflictDetails }, { status: 400 })
     }
 
     await addHistoricalEntry(personName, clockIn, clockOut)
