@@ -1,16 +1,16 @@
-# Redirigir todo al index.html (SPA routing para Next.js static export)
+# SPA routing para Next.js static export en Hostinger
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /
 
-    # No reescribir archivos/directorios que existen
+    # Llamadas al API PHP — servir directamente
+    RewriteRule ^php-api/(.*)$ php-api/$1 [L]
+
+    # Si el archivo o directorio existe, servirlo
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
 
-    # No reescribir llamadas al API PHP
-    RewriteCond %{REQUEST_URI} !^/php-api/
-
-    # Redirigir todo lo demás a index.html
+    # SPA fallback — todo lo demás va a index.html
     RewriteRule ^ /index.html [L]
 </IfModule>
 
@@ -26,5 +26,4 @@
     ExpiresByType application/javascript "access plus 1 year"
     ExpiresByType image/svg+xml "access plus 1 year"
     ExpiresByType image/png "access plus 1 year"
-    ExpiresByType image/jpeg "access plus 1 year"
 </IfModule>

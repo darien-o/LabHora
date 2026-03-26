@@ -1,0 +1,60 @@
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches: [php_server]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # --- Build estático Next.js ---
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build static site
+        run: npm run build
+
+      # --- Dependencias PHP (solo Sheets API) ---
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+
+      - name: Install Composer dependencies
+        working-directory: php-api
+        run: composer install --no-dev --optimize-autoloader
+
+      # --- Preparar carpeta de deploy ---
+      - name: Prepare deploy folder
+        run: |
+          mkdir deploy
+          cp .htaccess deploy/
+          cp -r out/* deploy/
+          cp -r php-api deploy/php-api
+          rm -f deploy/php-api/config.php
+          rm -f deploy/php-api/composer.json
+          rm -f deploy/php-api/composer.lock
+
+      # --- Subir a Hostinger via SFTP ---
+      - name: Deploy via SFTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTPS_HOST }}
+          username: ${{ secrets.FTP_USER_LABHORA }}
+          password: ${{ secrets.FTP_PASS_LABHORA }}
+          local-dir: ./deploy/
+          server-dir: ./
+          protocol: ftp
+          dangerous-clean-slate: false
+          secure: true

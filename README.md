@@ -51,59 +51,64 @@ La aplicación estará disponible en `http://localhost:3000`.
 
 ## Despliegue en Shared Hosting (Hostinger)
 
-La app se exporta como sitio estático + un backend PHP mínimo que hace de proxy a Google Sheets.
+La app se exporta como sitio estático + un backend PHP mínimo. GitHub Actions se encarga de hacer el build y subir solo los archivos necesarios a Hostinger via SFTP.
 
-### 1. Generar el sitio estático
+### Configuración inicial (una sola vez)
+
+#### 1. Secrets en GitHub
+
+Ve a tu repo → Settings → Secrets and variables → Actions, y agrega:
+
+| Secret | Valor |
+|--------|-------|
+| `FTP_HOST` | Tu servidor FTP de Hostinger (ej: `ftp.tudominio.com`) |
+| `FTP_USER` | Tu usuario FTP |
+| `FTP_PASS` | Tu contraseña FTP |
+
+Los datos FTP los encuentras en Hostinger → Archivos → Cuentas FTP.
+
+#### 2. Credenciales de Google en el servidor
+
+Vía SSH o File Manager de Hostinger:
+1. Crea `public_html/php-api/config.php` copiando el contenido de `config.example.php`
+2. Completa tus credenciales de Google
+3. Cambia `ALLOWED_ORIGIN` a tu dominio
+
+Este archivo nunca se sobreescribe en el deploy (se excluye del build).
+
+### Desplegar
+
+Solo haz push a `main`:
 
 ```bash
-npm run build
+git push origin main
 ```
 
-Esto genera la carpeta `out/` con todos los archivos HTML/CSS/JS.
+GitHub Actions automáticamente:
+1. Hace `npm run build` (genera `out/`)
+2. Hace `composer install` (solo Google Sheets API)
+3. Sube `out/*` + `php-api/` a `public_html/` via SFTP
 
-### 2. Preparar el backend PHP
-
-```bash
-cd php-api
-composer install
-```
-
-### 3. Configurar credenciales
-
-Edita `php-api/config.php` con tus credenciales de Google:
-- `GOOGLE_SHEET_ID` — ID de tu hoja de cálculo
-- `GOOGLE_CLIENT_EMAIL` — Email de la cuenta de servicio
-- `GOOGLE_PRIVATE_KEY` — Clave privada del JSON descargado
-- `ALLOWED_ORIGIN` — Cambia `*` por tu dominio en producción
-
-### 4. Subir archivos a Hostinger
-
-Estructura en `public_html/`:
+### Estructura resultante en public_html/
 
 ```
 public_html/
-├── .htaccess          ← copiar de hosting/.htaccess
-├── index.html         ← desde out/
-├── _next/             ← desde out/_next/
-├── placeholder.svg    ← desde out/ (assets estáticos)
-├── ...                ← demás archivos de out/
-└── php-api/
-    ├── .htaccess
-    ├── config.php
-    ├── sheets.php
-    ├── people.php
-    ├── time-entries.php
-    ├── clock-in.php
-    ├── clock-out.php
-    ├── historical-entry.php
-    ├── toggle-paid.php
-    └── vendor/        ← generado por composer install
+├── .htaccess              ← redirige al contenido de out/
+├── index.html             ← página principal
+├── _next/                 ← assets JS/CSS
+├── php-api/
+│   ├── .htaccess          ← protege config.php y vendor/
+│   ├── config.php         ← credenciales (creado manualmente, no en git)
+│   ├── sheets.php
+│   ├── people.php
+│   ├── time-entries.php
+│   ├── clock-in.php
+│   ├── clock-out.php
+│   ├── historical-entry.php
+│   ├── toggle-paid.php
+│   └── vendor/
+└── ...
 ```
-
-### 5. Verificar
-
-- Accede a `https://tudominio.com` — debería cargar la app
-- Accede a `https://tudominio.com/php-api/people.php` — debería devolver JSON con los cuidadores
 
 ## Uso
 

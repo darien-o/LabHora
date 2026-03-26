@@ -1,5 +1,19 @@
 {
   "require": {
-    "google/apiclient": "^2.16"
+    "google/apiclient": "^2.16",
+    "google/apiclient-services": "*"
+  },
+  "scripts": {
+    "post-install-cmd": [
+      "Google\\Task\\Composer::cleanup"
+    ],
+    "post-update-cmd": [
+      "Google\\Task\\Composer::cleanup"
+    ]
+  },
+  "extra": {
+    "google/apiclient-services": [
+      "Sheets"
+    ]
   }
 }
