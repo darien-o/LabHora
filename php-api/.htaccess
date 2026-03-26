@@ -1,0 +1,10 @@
+# Proteger archivos sensibles
+<FilesMatch "^(config\.php|sheets\.php|composer\.(json|lock))$">
+    Require all denied
+</FilesMatch>
+
+# Bloquear acceso al directorio vendor
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^vendor/ - [F,L]
+</IfModule>

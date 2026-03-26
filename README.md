@@ -13,7 +13,7 @@ Aplicación web para registrar las horas de trabajo de cuidadores. Permite ficha
 1. Crea una hoja de cálculo en Google Sheets con dos pestañas:
 
    - **Cuidadores** — Columna A con los nombres de los cuidadores
-   - **Registro** — Columnas: A (Fecha-Hora Entrada), B (Fecha-Hora Salida), C (Nombre), D (Tiempo Total)
+   - **Registro** — Columnas: A (Fecha-Hora Entrada), B (Fecha-Hora Salida), C (Nombre), D (Tiempo Total), E (Pagado)
 
 2. Comparte la hoja con el email de la cuenta de servicio (permisos de editor).
 
@@ -39,15 +39,71 @@ npm install
 ## Ejecución
 
 ```bash
-# Desarrollo
+# Desarrollo (con Next.js API routes)
 npm run dev
 
-# Producción
+# Generar sitio estático para hosting
 npm run build
-npm run start
+# Los archivos estáticos quedan en la carpeta out/
 ```
 
 La aplicación estará disponible en `http://localhost:3000`.
+
+## Despliegue en Shared Hosting (Hostinger)
+
+La app se exporta como sitio estático + un backend PHP mínimo que hace de proxy a Google Sheets.
+
+### 1. Generar el sitio estático
+
+```bash
+npm run build
+```
+
+Esto genera la carpeta `out/` con todos los archivos HTML/CSS/JS.
+
+### 2. Preparar el backend PHP
+
+```bash
+cd php-api
+composer install
+```
+
+### 3. Configurar credenciales
+
+Edita `php-api/config.php` con tus credenciales de Google:
+- `GOOGLE_SHEET_ID` — ID de tu hoja de cálculo
+- `GOOGLE_CLIENT_EMAIL` — Email de la cuenta de servicio
+- `GOOGLE_PRIVATE_KEY` — Clave privada del JSON descargado
+- `ALLOWED_ORIGIN` — Cambia `*` por tu dominio en producción
+
+### 4. Subir archivos a Hostinger
+
+Estructura en `public_html/`:
+
+```
+public_html/
+├── .htaccess          ← copiar de hosting/.htaccess
+├── index.html         ← desde out/
+├── _next/             ← desde out/_next/
+├── placeholder.svg    ← desde out/ (assets estáticos)
+├── ...                ← demás archivos de out/
+└── php-api/
+    ├── .htaccess
+    ├── config.php
+    ├── sheets.php
+    ├── people.php
+    ├── time-entries.php
+    ├── clock-in.php
+    ├── clock-out.php
+    ├── historical-entry.php
+    ├── toggle-paid.php
+    └── vendor/        ← generado por composer install
+```
+
+### 5. Verificar
+
+- Accede a `https://tudominio.com` — debería cargar la app
+- Accede a `https://tudominio.com/php-api/people.php` — debería devolver JSON con los cuidadores
 
 ## Uso
 

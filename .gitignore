@@ -35,5 +35,8 @@ coverage/
 # Tailwind CSS cache
 .tailwindcache/
 
+# PHP API
+php-api/vendor/
+php-api/config.php
 
 system.md

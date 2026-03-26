@@ -12,6 +12,7 @@ import {
   Filter, CircleDollarSign,
 } from "lucide-react"
 import { calculatePaySummary, formatCOP, type PaySummary } from "@/lib/colombian-labor"
+import { fetchPeople, fetchTimeEntries, postTogglePaid } from "@/lib/api-client"
 
 interface TimeEntry {
   id: string
@@ -63,12 +64,10 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
   const loadFreshData = async () => {
     setLoading(true)
     try {
-      const [peopleRes, entriesRes] = await Promise.all([
-        fetch("/api/people", { cache: "no-store", headers: { "Cache-Control": "no-cache" } }),
-        fetch("/api/time-entries", { cache: "no-store", headers: { "Cache-Control": "no-cache" } }),
+      const [peopleData, entriesData] = await Promise.all([
+        fetchPeople(),
+        fetchTimeEntries(),
       ])
-      const peopleData = await peopleRes.json()
-      const entriesData = await entriesRes.json()
       if (!peopleData.error) setLocalPeople(peopleData)
       if (!entriesData.error) setLocalEntries(entriesData)
     } catch (error) {
@@ -167,14 +166,7 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
   const handleTogglePaid = async (entry: TimeEntry) => {
     setTogglingId(entry.id)
     try {
-      const res = await fetch("/api/toggle-paid", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rowIndex: entry.rowIndex, paid: !entry.paid }),
-      })
-      const result = await res.json()
-      if (!res.ok) throw new Error(result.error)
-      // Update local state immediately
+      await postTogglePaid(entry.rowIndex, !entry.paid)
       setLocalEntries((prev) =>
         prev.map((e) => (e.id === entry.id ? { ...e, paid: !entry.paid } : e))
       )

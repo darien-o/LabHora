@@ -27,6 +27,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  fetchPeople,
+  fetchTimeEntries,
+  postClockIn,
+  postClockOut,
+  postHistoricalEntry,
+} from "@/lib/api-client";
 
 interface Person {
   id: string;
@@ -89,27 +96,13 @@ export default function ClockTracker() {
 
   const loadPeople = async () => {
     try {
-      console.log("Fetching people from API...");
-      const response = await fetch("/api/people", {
-        cache: "no-store",
-        headers: {
-          "Cache-Control": "no-cache",
-        },
-      });
-      const data = await response.json();
+      const data = await fetchPeople();
       if (data.error) {
         throw new Error(data.error);
       }
 
-      console.log(
-        "People loaded:",
-        data.length,
-        "Active person:",
-        data.find((person: Person) => person.isActive)?.name || "None"
-      );
       setPeople(data);
 
-      // Update selected person if they exist in the new data
       if (selectedPerson) {
         const updatedPerson = data.find(
           (person: Person) => person.name === selectedPerson.name
@@ -134,19 +127,10 @@ export default function ClockTracker() {
 
   const loadTimeEntries = async () => {
     try {
-      console.log("Fetching time entries from API...");
-      const response = await fetch("/api/time-entries", {
-        cache: "no-store",
-        headers: {
-          "Cache-Control": "no-cache",
-        },
-      });
-      const data = await response.json();
+      const data = await fetchTimeEntries();
       if (data.error) {
         throw new Error(data.error);
       }
-
-      console.log("Time entries loaded:", data.length);
       setTimeEntries(data);
     } catch (error: any) {
       console.error("Error loading time entries:", error);
@@ -239,23 +223,8 @@ export default function ClockTracker() {
 
     setLoading(true);
     try {
-      const response = await fetch("/api/clock-in", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          personName: selectedPerson.name,
-          timestamp: new Date().toISOString(),
-        }),
-      });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || "Error al fichar entrada");
-      }
-
-      // Refresh data from server to get updated state
+      await postClockIn(selectedPerson.name, new Date().toISOString());
       await refreshData();
-
       showAlertMessage(`${selectedPerson.name} fichó entrada correctamente!`);
     } catch (error: any) {
       console.error("Error clocking in:", error);
@@ -296,23 +265,8 @@ export default function ClockTracker() {
 
     setLoading(true);
     try {
-      const response = await fetch("/api/clock-out", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          personName: selectedPerson.name,
-          timestamp,
-        }),
-      });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || "Error al fichar salida");
-      }
-
-      // Refresh data from server to get updated state
+      await postClockOut(selectedPerson.name, timestamp);
       await refreshData();
-
       showAlertMessage(`${selectedPerson.name} fichó salida correctamente!`);
     } catch (error: any) {
       console.error("Error clocking out:", error);
@@ -329,21 +283,7 @@ export default function ClockTracker() {
 
     setLoading(true);
     try {
-      const response = await fetch("/api/historical-entry", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          personName: selectedPerson.name,
-          clockIn,
-          clockOut,
-        }),
-      });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || "Error al agregar entrada histórica");
-      }
-
+      await postHistoricalEntry(selectedPerson.name, clockIn, clockOut);
       await loadTimeEntries();
       showAlertMessage(
         `Entrada histórica agregada para ${selectedPerson.name}!`
