@@ -57,10 +57,12 @@ const formatDateTimeForSheet = (date: Date): string => {
 
 export interface TimeEntry {
   id: string
+  rowIndex: number // 1-based row index in the sheet (for updates)
   dateTimeIn: string
   dateTimeOut?: string
   personName: string
   totalTime?: number
+  paid: boolean
 }
 
 export interface Person {
@@ -112,30 +114,36 @@ export async function getTimeEntries(): Promise<TimeEntry[]> {
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEETS.REGISTRO}!A:D`,
+      range: `${SHEETS.REGISTRO}!A:E`,
     })
 
     const rows = response.data.values || []
     console.log("Raw rows length from sheet:", rows.length)
-    console.log("Raw rows data:", rows)
 
     if (rows.length <= 1) {
       console.log("No time entries found in sheet")
-      return [] // Return empty array
+      return []
     }
 
     // Skip header row if it exists and filter valid rows
-    const dataRows = rows.slice(1).filter((row) => row.length > 0 && row[0] && row[2])
+    const dataRows: { row: any[]; rowIndex: number }[] = []
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i]
+      if (row.length > 0 && row[0] && row[2]) {
+        dataRows.push({ row, rowIndex: i + 1 }) // 1-based for Sheets API
+      }
+    }
 
     console.log("Filtered data rows length:", dataRows.length)
-    console.log("Filtered data rows:", dataRows)
 
-    return dataRows.map((row, index) => ({
-      id: `entry-${index}-${Date.now()}`, // Unique ID
+    return dataRows.map(({ row, rowIndex }, index) => ({
+      id: `entry-${index}-${rowIndex}`,
+      rowIndex,
       dateTimeIn: row[0],
       dateTimeOut: row[1] || undefined,
       personName: row[2],
       totalTime: row[3] ? Number.parseFloat(row[3]) : undefined,
+      paid: (row[4] || "").toString().toLowerCase() === "sí" || (row[4] || "").toString().toLowerCase() === "si",
     }))
   } catch (error: any) {
     console.error("Error getting time entries:", error)
@@ -207,11 +215,11 @@ export async function clockIn(personName: string, timestamp: string): Promise<vo
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEETS.REGISTRO}!A:D`,
+      range: `${SHEETS.REGISTRO}!A:E`,
       valueInputOption: "USER_ENTERED",
       insertDataOption: "INSERT_ROWS",
       requestBody: {
-        values: [[formattedTimestamp, "", personName, ""]],
+        values: [[formattedTimestamp, "", personName, "", "No"]],
       },
     })
   } catch (error: any) {
@@ -314,11 +322,11 @@ export async function addHistoricalEntry(
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEETS.REGISTRO}!A:D`,
+      range: `${SHEETS.REGISTRO}!A:E`,
       valueInputOption: "USER_ENTERED",
       insertDataOption: "INSERT_ROWS",
       requestBody: {
-        values: [[clockInFormatted, clockOutFormatted, personName, totalHours.toFixed(2)]],
+        values: [[clockInFormatted, clockOutFormatted, personName, totalHours.toFixed(2), "No"]],
       },
     })
   } catch (error: any) {
@@ -427,5 +435,26 @@ function parseSpanishDateTime(dateTimeStr: string): Date {
   } catch (error) {
     console.error("Error parsing Spanish datetime:", dateTimeStr, error)
     return new Date(dateTimeStr) // Fallback to standard parsing
+  }
+}
+
+
+
+// Toggle paid status for a time entry
+export async function togglePaidStatus(rowIndex: number, paid: boolean): Promise<void> {
+  try {
+    const sheets = await getSheets()
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SHEETS.REGISTRO}!E${rowIndex}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: {
+        values: [[paid ? "Sí" : "No"]],
+      },
+    })
+  } catch (error: any) {
+    console.error("Error toggling paid status:", error)
+    throw new Error(`Error al actualizar estado de pago: ${error.message}`)
   }
 }

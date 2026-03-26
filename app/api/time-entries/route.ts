@@ -35,10 +35,12 @@ export async function GET() {
     // Format entries for frontend
     const formattedEntries = entries.map((entry) => ({
       id: entry.id,
+      rowIndex: entry.rowIndex,
       personName: entry.personName,
       clockIn: entry.dateTimeIn,
       clockOut: entry.dateTimeOut,
       totalHours: entry.totalTime,
+      paid: entry.paid,
       date: entry.dateTimeIn
         ? new Date(parseSpanishDateTime(entry.dateTimeIn))
             .toISOString()

@@ -39,10 +39,12 @@ interface Person {
 
 interface TimeEntry {
   id: string;
+  rowIndex: number;
   personName: string;
   clockIn: string;
   clockOut?: string;
   totalHours?: number;
+  paid: boolean;
   date: string;
 }
 
