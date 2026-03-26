@@ -10,10 +10,11 @@ Aplicación web para registrar las horas de trabajo de cuidadores. Permite ficha
 
 ## Configuración de Google Sheets
 
-1. Crea una hoja de cálculo en Google Sheets con dos pestañas:
+1. Crea una hoja de cálculo en Google Sheets con tres pestañas:
 
    - **Cuidadores** — Columna A con los nombres de los cuidadores
    - **Registro** — Columnas: A (Fecha-Hora Entrada), B (Fecha-Hora Salida), C (Nombre), D (Tiempo Total), E (Pagado)
+   - **Turnos** — Columnas: A (Fecha YYYY-MM-DD), B (Nombre), C (Hora Inicio HH:mm), D (Hora Fin HH:mm)
 
 2. Comparte la hoja con el email de la cuenta de servicio (permisos de editor).
 
@@ -117,3 +118,4 @@ public_html/
 3. Presiona **Salida** para fichar la hora de salida (si el turno supera 8 horas, se pedirá confirmación)
 4. Si otro cuidador ya está fichado, puedes agregar un registro histórico con fechas y horas personalizadas
 5. Consulta el historial en la pestaña **Historial**, con filtro por cuidador y totales de horas
+6. En la pestaña **Turnos**, asigna bloques de 2 horas (6AM–10PM) a cada cuidador para la semana. Navega entre semanas y visualiza la cobertura

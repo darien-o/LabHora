@@ -14,6 +14,7 @@ PEGA_TU_CLAVE_PRIVADA_AQUI
 
 define('SHEET_REGISTRO', 'Registro');
 define('SHEET_CUIDADORES', 'Cuidadores');
+define('SHEET_TURNOS', 'Turnos');
 
 // Cambiar a 'https://tudominio.com' en producción
 define('ALLOWED_ORIGIN', '*');

@@ -3,12 +3,49 @@
  * Módulo central de Google Sheets — autenticación y helpers.
  */
 
-require_once __DIR__ . '/vendor/autoload.php';
-require_once __DIR__ . '/config.php';
+// Show errors in response during debugging (remove in production)
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
+
+// Check vendor autoload exists
+$autoloadPath = __DIR__ . '/vendor/autoload.php';
+if (!file_exists($autoloadPath)) {
+    http_response_code(500);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'vendor/autoload.php no encontrado. Ejecuta: composer install en php-api/']);
+    exit;
+}
+require_once $autoloadPath;
+
+// Check config exists
+$configPath = __DIR__ . '/config.php';
+if (!file_exists($configPath)) {
+    http_response_code(500);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'config.php no encontrado. Copia config.example.php a config.php y completa las credenciales.']);
+    exit;
+}
+require_once $configPath;
+
+// Validate required constants
+if (!defined('GOOGLE_SHEET_ID') || !defined('GOOGLE_CLIENT_EMAIL') || !defined('GOOGLE_PRIVATE_KEY')) {
+    http_response_code(500);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'config.php incompleto. Verifica GOOGLE_SHEET_ID, GOOGLE_CLIENT_EMAIL y GOOGLE_PRIVATE_KEY.']);
+    exit;
+}
+
+if (empty(GOOGLE_SHEET_ID) || empty(GOOGLE_CLIENT_EMAIL) || empty(GOOGLE_PRIVATE_KEY)) {
+    http_response_code(500);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'Las credenciales en config.php están vacías. Completa los valores.']);
+    exit;
+}
 
 function cors_headers() {
+    $origin = defined('ALLOWED_ORIGIN') ? ALLOWED_ORIGIN : '*';
     header('Content-Type: application/json; charset=utf-8');
-    header('Access-Control-Allow-Origin: ' . ALLOWED_ORIGIN);
+    header('Access-Control-Allow-Origin: ' . $origin);
     header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type');
     header('Cache-Control: no-cache, no-store, must-revalidate');
@@ -20,15 +57,20 @@ function cors_headers() {
 }
 
 function get_sheets_service(): Google\Service\Sheets {
-    $client = new Google\Client();
-    $client->setAuthConfig([
-        'type' => 'service_account',
-        'client_email' => GOOGLE_CLIENT_EMAIL,
-        'private_key' => GOOGLE_PRIVATE_KEY,
-        'token_uri' => 'https://oauth2.googleapis.com/token',
-    ]);
-    $client->setScopes([Google\Service\Sheets::SPREADSHEETS]);
-    return new Google\Service\Sheets($client);
+    try {
+        $client = new Google\Client();
+        $client->setAuthConfig([
+            'type' => 'service_account',
+            'client_email' => GOOGLE_CLIENT_EMAIL,
+            'private_key' => GOOGLE_PRIVATE_KEY,
+            'token_uri' => 'https://oauth2.googleapis.com/token',
+        ]);
+        $client->setScopes([Google\Service\Sheets::SPREADSHEETS]);
+        return new Google\Service\Sheets($client);
+    } catch (Exception $e) {
+        json_error('Error de autenticación con Google: ' . $e->getMessage());
+        exit; // unreachable but makes static analysis happy
+    }
 }
 
 function json_response($data, int $status = 200) {
@@ -50,18 +92,12 @@ function get_json_body(): array {
     return $data;
 }
 
-/**
- * Convierte un timestamp ISO a formato DD/MM/YYYY, HH:mm:ss en zona GMT-5.
- */
 function format_datetime_for_sheet(string $isoTimestamp): string {
     $dt = new DateTime($isoTimestamp);
     $dt->setTimezone(new DateTimeZone('America/Bogota'));
     return $dt->format('d/m/Y, H:i:s');
 }
 
-/**
- * Parsea "DD/MM/YYYY, HH:mm:ss" a DateTime en zona Bogotá.
- */
 function parse_spanish_datetime(string $dateTimeStr): DateTime {
     $parts = explode(', ', $dateTimeStr);
     if (count($parts) !== 2) {

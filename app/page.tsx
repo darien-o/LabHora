@@ -14,10 +14,12 @@ import {
   History,
   Users,
   RefreshCw,
+  CalendarDays,
 } from "lucide-react";
 import { ConfirmClockOutDialog } from "@/components/confirm-clock-out-dialog";
 import { HistoricalEntryDialog } from "@/components/historical-entry-dialog";
 import { HistoryView } from "@/components/history-view";
+import { ScheduleView } from "@/components/schedule-view";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -346,12 +348,16 @@ export default function ClockTracker() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="clock" className="flex items-center gap-2">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="clock" className="flex items-center gap-1 text-xs">
               <Timer className="h-4 w-4" />
               Fichar
             </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-2">
+            <TabsTrigger value="schedule" className="flex items-center gap-1 text-xs">
+              <CalendarDays className="h-4 w-4" />
+              Turnos
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center gap-1 text-xs">
               <History className="h-4 w-4" />
               Historial
             </TabsTrigger>
@@ -553,6 +559,10 @@ export default function ClockTracker() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="schedule">
+            <ScheduleView people={people} />
           </TabsContent>
 
           <TabsContent value="history">

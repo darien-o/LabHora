@@ -57,3 +57,5 @@ jobs:
           server-dir: ./
           protocol: ftps
           dangerous-clean-slate: false
+          exclude: |
+            **/config.php

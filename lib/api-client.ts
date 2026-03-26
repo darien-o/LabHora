@@ -92,3 +92,31 @@ export async function postTogglePaid(rowIndex: number, paid: boolean) {
   if (!res.ok) throw new Error(data.error || "Error al cambiar estado de pago")
   return data
 }
+
+// --- Schedule endpoints ---
+
+export async function fetchSchedule(weekStart: string) {
+  const res = await fetch(`${url("schedule")}?weekStart=${weekStart}`, {
+    cache: "no-store",
+    headers: NO_CACHE_HEADERS,
+  })
+  return res.json()
+}
+
+export async function postScheduleShift(data: {
+  action: "add" | "remove"
+  date?: string
+  personName?: string
+  startTime?: string
+  endTime?: string
+  rowIndex?: number
+}) {
+  const res = await fetch(url("schedule"), {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(data),
+  })
+  const result = await res.json()
+  if (!res.ok) throw new Error(result.error || "Error al gestionar turno")
+  return result
+}

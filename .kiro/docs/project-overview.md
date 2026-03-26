@@ -21,7 +21,7 @@ GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\
 
 ## Google Sheets Structure
 
-Two sheets (tabs) in a single spreadsheet:
+Three sheets (tabs) in a single spreadsheet:
 
 ### "Cuidadores" sheet
 | Column A |
@@ -39,6 +39,14 @@ Two sheets (tabs) in a single spreadsheet:
 - An active (clocked-in) entry has column B empty
 - Total time is calculated as decimal hours (e.g., `8.50`)
 - Column E tracks payment status ("Sí" = paid, "No" or empty = unpaid)
+
+### "Turnos" sheet (shift scheduling)
+| A (Fecha) | B (Nombre) | C (Hora Inicio) | D (Hora Fin) |
+|---|---|---|---|
+| 2026-03-23 | María García | 06:00 | 08:00 |
+
+- Dates in YYYY-MM-DD format
+- Times in HH:mm format (2-hour blocks from 06:00 to 22:00)
 
 ## Project Structure
 
