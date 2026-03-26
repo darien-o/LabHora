@@ -55,6 +55,5 @@ jobs:
           password: ${{ secrets.FTP_PASS_LABHORA }}
           local-dir: ./deploy/
           server-dir: ./
-          protocol: ftp
+          protocol: ftps
           dangerous-clean-slate: false
-          secure: true
