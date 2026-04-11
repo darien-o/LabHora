@@ -15,9 +15,11 @@ import {
   Users,
   RefreshCw,
   CalendarDays,
+  Calendar,
 } from "lucide-react";
 import { ConfirmClockOutDialog } from "@/components/confirm-clock-out-dialog";
 import { HistoricalEntryDialog } from "@/components/historical-entry-dialog";
+import { BatchHistoricalDialog } from "@/components/batch-historical-dialog";
 import { HistoryView } from "@/components/history-view";
 import { ScheduleView } from "@/components/schedule-view";
 import {
@@ -65,6 +67,7 @@ export default function ClockTracker() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [showConfirmClockOut, setShowConfirmClockOut] = useState(false);
   const [showHistoricalEntry, setShowHistoricalEntry] = useState(false);
+  const [showBatchHistorical, setShowBatchHistorical] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -299,6 +302,14 @@ export default function ClockTracker() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBatchEntry = async (
+    personName: string,
+    clockIn: string,
+    clockOut: string
+  ) => {
+    await postHistoricalEntry(personName, clockIn, clockOut);
   };
 
   const activePerson = getActivePerson();
@@ -566,6 +577,15 @@ export default function ClockTracker() {
           </TabsContent>
 
           <TabsContent value="history">
+            <div className="mb-4">
+              <Button
+                onClick={() => setShowBatchHistorical(true)}
+                className="w-full bg-blue-600 hover:bg-blue-700"
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Agregar Días Pasados por Lote
+              </Button>
+            </div>
             <HistoryView
               timeEntries={timeEntries}
               people={people}
@@ -589,6 +609,15 @@ export default function ClockTracker() {
         person={selectedPerson}
         onConfirm={handleHistoricalEntry}
         timeEntries={timeEntries}
+      />
+
+      <BatchHistoricalDialog
+        open={showBatchHistorical}
+        onOpenChange={setShowBatchHistorical}
+        people={people}
+        timeEntries={timeEntries}
+        onSubmitEntry={handleBatchEntry}
+        onComplete={refreshData}
       />
 
       <AlertDialog open={showAlert} onOpenChange={setShowAlert}>
