@@ -14,7 +14,7 @@ PEGA_TU_CLAVE_PRIVADA_AQUI
 
 define('SHEET_REGISTRO', 'Registro');
 define('SHEET_CUIDADORES', 'Cuidadores');
-define('SHEET_TURNOS', 'Turnos');
+define('SHEET_TURNOS', 'Turnos');  // Crear esta pestaña en Google Sheets con columnas: Fecha | Cuidador | Hora Inicio | Hora Fin
 
 // Cambiar a 'https://tudominio.com' en producción
 define('ALLOWED_ORIGIN', '*');
