@@ -18,3 +18,6 @@ define('SHEET_TURNOS', 'Turnos');  // Crear esta pestaña en Google Sheets con c
 
 // Cambiar a 'https://tudominio.com' en producción
 define('ALLOWED_ORIGIN', '*');
+
+// Google Drive folder ID para fotos (crear carpeta en Drive y compartir con la cuenta de servicio)
+define('GOOGLE_DRIVE_FOLDER_ID', '');

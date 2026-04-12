@@ -92,6 +92,7 @@ export function BatchHistoricalDialog({
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [currentNote, setCurrentNote] = useState("");
 
   // Conflict dialog state
   const [showConflictDialog, setShowConflictDialog] = useState(false);
@@ -276,6 +277,7 @@ export function BatchHistoricalDialog({
     if (nextDateStr <= today) {
       setCurrentDate(nextDateStr);
     }
+    setCurrentNote("");
   };
 
   const handleConflictAdjust = () => {
@@ -324,6 +326,7 @@ export function BatchHistoricalDialog({
     setCurrentDate("");
     setCurrentClockIn("08:00");
     setCurrentClockOut("17:00");
+    setCurrentNote("");
   };
 
   const removeEntry = (id: string) => {
@@ -394,6 +397,7 @@ export function BatchHistoricalDialog({
     setCurrentDate("");
     setCurrentClockIn("08:00");
     setCurrentClockOut("17:00");
+    setCurrentNote("");
     setEntries([]);
     setError("");
     setIsSubmitting(false);
@@ -500,6 +504,21 @@ export function BatchHistoricalDialog({
                     disabled={isSubmitting}
                   />
                 </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <Label htmlFor="batch-note" className="text-xs text-gray-600">
+                  Nota (opcional)
+                </Label>
+                <textarea
+                  id="batch-note"
+                  value={currentNote}
+                  onChange={(e) => setCurrentNote(e.target.value)}
+                  placeholder="Ej: Turno normal, sin novedades..."
+                  className="w-full min-h-[60px] p-3 border rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400 mt-1"
+                  disabled={isSubmitting}
+                />
               </div>
 
               <div className="flex gap-2">

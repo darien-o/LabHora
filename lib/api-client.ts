@@ -120,3 +120,20 @@ export async function postScheduleShift(data: {
   if (!res.ok) throw new Error(result.error || "Error al gestionar turno")
   return result
 }
+
+// --- Photo upload ---
+
+export async function uploadPhoto(file: File, personName: string, note?: string) {
+  const formData = new FormData()
+  formData.append("photo", file)
+  formData.append("personName", personName)
+  if (note) formData.append("note", note)
+
+  const res = await fetch(url("upload-photo"), {
+    method: "POST",
+    body: formData,
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || "Error al subir foto")
+  return data
+}
