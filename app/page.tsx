@@ -127,14 +127,15 @@ function ClockTrackerInner() {
 
       setPeople(data);
 
-      if (selectedPerson) {
+      // Update selectedPerson with fresh data using functional update
+      // to avoid stale closure issues
+      setSelectedPerson((prev) => {
+        if (!prev) return prev;
         const updatedPerson = data.find(
-          (person: Person) => person.name === selectedPerson.name
+          (person: Person) => person.name === prev.name
         );
-        if (updatedPerson) {
-          setSelectedPerson(updatedPerson);
-        }
-      }
+        return updatedPerson || prev;
+      });
     } catch (error: any) {
       console.error("Error loading people:", error);
       if (error.message?.includes("permission")) {

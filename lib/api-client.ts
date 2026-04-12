@@ -96,7 +96,7 @@ export async function postTogglePaid(rowIndex: number, paid: boolean) {
 // --- Schedule endpoints ---
 
 export async function fetchSchedule(weekStart: string) {
-  const res = await fetch(`${url("schedule")}?weekStart=${weekStart}`, {
+  const res = await fetch(`${url("schedule")}?weekStart=${weekStart}&_t=${Date.now()}`, {
     cache: "no-store",
     headers: NO_CACHE_HEADERS,
   })

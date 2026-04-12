@@ -174,7 +174,17 @@ export function ScheduleView({ people }: ScheduleViewProps) {
         startTime: dialogStart,
         endTime: dialogEnd,
       })
-      await loadShifts()
+      // Optimistically add to local state immediately
+      const tempShift: Shift = {
+        rowIndex: Date.now(), // temporary rowIndex until reload
+        date: dialogDate,
+        personName: selectedPerson,
+        startTime: dialogStart,
+        endTime: dialogEnd,
+      }
+      setShifts((prev) => [...prev, tempShift])
+      // Reload after a short delay to get the real rowIndex from the sheet
+      setTimeout(() => { loadShifts() }, 1500)
     } catch (e) { console.error("Error adding shift:", e) }
     finally { setSaving(false) }
   }

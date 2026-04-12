@@ -4,7 +4,7 @@
     RewriteBase /
 
     # Llamadas al API PHP — servir directamente
-    RewriteRule ^php-api/(.*)$ php-api/$1 [L]
+    RewriteRule ^php-api/(.*)$ php-api/$1 [QSA,L]
 
     # Si el archivo o directorio existe, servirlo
     RewriteCond %{REQUEST_FILENAME} !-f
@@ -26,4 +26,13 @@
     ExpiresByType application/javascript "access plus 1 year"
     ExpiresByType image/svg+xml "access plus 1 year"
     ExpiresByType image/png "access plus 1 year"
+</IfModule>
+
+# No cache para respuestas JSON (API)
+<IfModule mod_headers.c>
+    <FilesMatch "\.php$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
 </IfModule>
