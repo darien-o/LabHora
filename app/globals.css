@@ -86,5 +86,23 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-size: 18px;
+    line-height: 1.6;
+    -webkit-text-size-adjust: 100%;
   }
+  /* Larger touch targets for elderly users */
+  button, [role="button"], a, select, input, [role="tab"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  input[type="date"], input[type="time"], input[type="text"], input[type="password"] {
+    font-size: 18px !important;
+    padding: 12px !important;
+    height: auto !important;
+    min-height: 52px;
+  }
+  /* Stronger muted text contrast */
+  .text-gray-400 { color: #6b7280 !important; }
+  .text-gray-500 { color: #4b5563 !important; }
+  .text-gray-600 { color: #374151 !important; }
 }

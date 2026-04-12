@@ -28,6 +28,7 @@ import { ScheduleView } from "@/components/schedule-view";
 import { AdminLoginDialog } from "@/components/admin-login-dialog";
 import { AdminAlertsPanel } from "@/components/admin-alerts-panel";
 import { AdminProvider, useAdmin } from "@/lib/admin-context";
+import { MarujitaIcon } from "@/components/marujita-icon";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -336,15 +337,15 @@ function ClockTrackerInner() {
 
   if (initialLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="text-lg font-medium text-gray-800 mt-4">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-5 flex items-center justify-center">
+        <Card className="w-full max-w-lg">
+          <CardContent className="pt-8">
+            <div className="text-center py-10">
+              <div className="animate-spin rounded-full h-14 w-14 border-b-3 border-blue-600 mx-auto"></div>
+              <p className="text-xl font-semibold text-gray-900 mt-5">
                 Cargando datos...
               </p>
-              <p className="text-sm text-gray-600 mt-2">
+              <p className="text-base text-gray-600 mt-2">
                 Conectando con Google Sheets
               </p>
             </div>
@@ -355,17 +356,17 @@ function ClockTrackerInner() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-md mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-5">
+      <div className="max-w-lg mx-auto space-y-6">
         {/* Header */}
         <Card className="text-center">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="w-10" /> {/* spacer */}
-              <div className="flex items-center justify-center gap-2">
-                <Clock className="h-6 w-6 text-blue-600" />
-                <CardTitle className="text-2xl font-bold text-gray-800">
-                  Control de Horarios
+          <CardHeader className="pb-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-12" /> {/* spacer */}
+              <div className="flex items-center justify-center gap-3">
+                <MarujitaIcon className="h-10 w-10" />
+                <CardTitle className="text-2xl font-bold text-gray-900">
+                  Marujita Horas
                 </CardTitle>
               </div>
               <div className="flex items-center gap-1">
@@ -373,11 +374,11 @@ function ClockTrackerInner() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="relative h-8 w-8 p-0"
+                    className="relative h-10 w-10 p-0"
                     onClick={() => setActiveTab("admin")}
                   >
-                    <Bell className="h-4 w-4 text-orange-600" />
-                    <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
+                    <Bell className="h-5 w-5 text-orange-600" />
+                    <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
                       {unresolvedAlerts}
                     </span>
                   </Button>
@@ -387,62 +388,62 @@ function ClockTrackerInner() {
                     variant="ghost"
                     size="sm"
                     onClick={logout}
-                    className="h-8 w-8 p-0 text-purple-600"
+                    className="h-10 w-10 p-0 text-purple-600"
                     title="Cerrar sesión admin"
                   >
-                    <ShieldOff className="h-4 w-4" />
+                    <ShieldOff className="h-5 w-5" />
                   </Button>
                 ) : (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowAdminLogin(true)}
-                    className="h-8 w-8 p-0 text-gray-400 hover:text-purple-600"
+                    className="h-10 w-10 p-0 text-gray-400 hover:text-purple-600"
                     title="Acceso admin"
                   >
-                    <Shield className="h-4 w-4" />
+                    <Shield className="h-5 w-5" />
                   </Button>
                 )}
               </div>
             </div>
             {isAdmin && (
-              <div className="flex items-center justify-center gap-1 mb-1">
-                <Badge className="bg-purple-100 text-purple-700 text-[10px]">
-                  <Shield className="h-3 w-3 mr-1" />
+              <div className="flex items-center justify-center gap-1 mb-2">
+                <Badge className="bg-purple-100 text-purple-700 text-sm px-3 py-1">
+                  <Shield className="h-4 w-4 mr-1" />
                   Admin
                 </Badge>
               </div>
             )}
             <div className="space-y-1">
-              <p className="text-3xl font-mono font-bold text-blue-600">
+              <p className="text-4xl font-mono font-bold text-blue-600">
                 {formatTime(currentTime)}
               </p>
-              <p className="text-sm text-gray-600">{formatDate(currentTime)}</p>
+              <p className="text-base text-gray-700 capitalize">{formatDate(currentTime)}</p>
             </div>
           </CardHeader>
         </Card>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${isAdmin ? "grid-cols-4" : "grid-cols-3"}`}>
-            <TabsTrigger value="clock" className="flex items-center gap-1 text-xs">
-              <Timer className="h-4 w-4" />
+          <TabsList className={`grid w-full h-auto ${isAdmin ? "grid-cols-4" : "grid-cols-3"}`}>
+            <TabsTrigger value="clock" className="flex items-center gap-1.5 text-sm py-3">
+              <Timer className="h-5 w-5" />
               Fichar
             </TabsTrigger>
-            <TabsTrigger value="schedule" className="flex items-center gap-1 text-xs">
-              <CalendarDays className="h-4 w-4" />
+            <TabsTrigger value="schedule" className="flex items-center gap-1.5 text-sm py-3">
+              <CalendarDays className="h-5 w-5" />
               Turnos
             </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-1 text-xs">
-              <History className="h-4 w-4" />
+            <TabsTrigger value="history" className="flex items-center gap-1.5 text-sm py-3">
+              <History className="h-5 w-5" />
               Historial
             </TabsTrigger>
             {isAdmin && (
-              <TabsTrigger value="admin" className="flex items-center gap-1 text-xs relative">
-                <Shield className="h-4 w-4" />
+              <TabsTrigger value="admin" className="flex items-center gap-1.5 text-sm py-3 relative">
+                <Shield className="h-5 w-5" />
                 Admin
                 {unresolvedAlerts > 0 && (
-                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
                     {unresolvedAlerts}
                   </span>
                 )}
@@ -454,17 +455,17 @@ function ClockTrackerInner() {
             {/* Active Status - Only show if there's actually an active person */}
             {activePerson && (
               <Card className="border-green-200 bg-green-50 shadow-md">
-                <CardContent className="pt-4">
-                  <div className="flex items-center gap-3">
+                <CardContent className="pt-5 pb-5">
+                  <div className="flex items-center gap-4">
                     <div className="relative">
-                      <CheckCircle2 className="h-6 w-6 text-green-600" />
-                      <div className="absolute -top-1 -right-1 h-3 w-3 bg-green-500 rounded-full animate-pulse" />
+                      <CheckCircle2 className="h-8 w-8 text-green-600" />
+                      <div className="absolute -top-1 -right-1 h-4 w-4 bg-green-500 rounded-full animate-pulse" />
                     </div>
                     <div className="flex-1">
-                      <p className="font-bold text-green-800 text-lg">
+                      <p className="font-bold text-green-900 text-xl">
                         {activePerson.name}
                       </p>
-                      <p className="text-sm text-green-600">
+                      <p className="text-base text-green-700">
                         Fichado desde las{" "}
                         {activePerson.lastClockIn
                           ? (() => {
@@ -478,7 +479,7 @@ function ClockTrackerInner() {
                           : "Desconocido"}
                       </p>
                     </div>
-                    <Badge className="bg-green-100 text-green-800 border-green-300">
+                    <Badge className="bg-green-100 text-green-800 border-green-300 text-sm px-3 py-1">
                       ACTIVO
                     </Badge>
                   </div>
@@ -490,8 +491,8 @@ function ClockTrackerInner() {
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Users className="h-5 w-5" />
+                  <CardTitle className="text-xl flex items-center gap-2">
+                    <Users className="h-6 w-6" />
                     Seleccionar Cuidador
                   </CardTitle>
                   <Button
@@ -499,48 +500,49 @@ function ClockTrackerInner() {
                     size="sm"
                     onClick={refreshData}
                     disabled={loading}
+                    className="h-11 w-11 p-0"
                   >
                     <RefreshCw
-                      className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+                      className={`h-5 w-5 ${loading ? "animate-spin" : ""}`}
                     />
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
                 {people.length === 0 ? (
-                  <div className="text-center py-8">
-                    <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600">
+                  <div className="text-center py-10">
+                    <AlertCircle className="h-14 w-14 text-gray-400 mx-auto mb-4" />
+                    <p className="text-lg text-gray-700">
                       No se encontraron cuidadores
                     </p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Verifica que la hoja "Cuidadores" tenga nombres en la
+                    <p className="text-base text-gray-500 mt-2">
+                      Verifica que la hoja &quot;Cuidadores&quot; tenga nombres en la
                       columna A
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-4">
                     {people.map((person) => (
                       <div
                         key={person.id}
-                        className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                        className={`relative p-5 rounded-xl border-3 cursor-pointer transition-all ${
                           selectedPerson?.id === person.id
-                            ? "border-blue-500 bg-blue-50 shadow-md"
+                            ? "border-blue-500 bg-blue-50 shadow-lg"
                             : person.isActive
                             ? "border-green-300 bg-green-50"
-                            : "border-gray-200 hover:border-gray-300"
+                            : "border-gray-200 hover:border-gray-400"
                         }`}
                         onClick={() => setSelectedPerson(person)}
                       >
-                        <div className="flex flex-col items-center space-y-2">
+                        <div className="flex flex-col items-center space-y-3">
                           <div className="relative">
-                            <Avatar className="h-12 w-12">
+                            <Avatar className="h-16 w-16">
                               <AvatarImage
                                 src={person.avatar || "/placeholder.svg"}
                                 alt={person.name}
                               />
                               <AvatarFallback
-                                className={`${
+                                className={`text-lg font-bold ${
                                   person.isActive
                                     ? "bg-green-100 text-green-700"
                                     : "bg-blue-100 text-blue-600"
@@ -550,15 +552,15 @@ function ClockTrackerInner() {
                               </AvatarFallback>
                             </Avatar>
                             {person.isActive && (
-                              <div className="absolute -top-1 -right-1 h-4 w-4 bg-green-500 rounded-full border-2 border-white animate-pulse" />
+                              <div className="absolute -top-1 -right-1 h-5 w-5 bg-green-500 rounded-full border-2 border-white animate-pulse" />
                             )}
                           </div>
                           <div className="text-center">
                             <p
-                              className={`font-medium text-sm ${
+                              className={`font-semibold text-base ${
                                 person.isActive
-                                  ? "text-green-800"
-                                  : "text-gray-800"
+                                  ? "text-green-900"
+                                  : "text-gray-900"
                               }`}
                             >
                               {person.name}
@@ -566,7 +568,7 @@ function ClockTrackerInner() {
                             {person.isActive && (
                               <Badge
                                 variant="secondary"
-                                className="text-xs mt-1 bg-green-100 text-green-700"
+                                className="text-sm mt-1 bg-green-100 text-green-700 px-3"
                               >
                                 Fichado
                               </Badge>
@@ -574,7 +576,7 @@ function ClockTrackerInner() {
                           </div>
                         </div>
                         {selectedPerson?.id === person.id && (
-                          <CheckCircle2 className="absolute top-2 right-2 h-5 w-5 text-blue-500" />
+                          <CheckCircle2 className="absolute top-2 right-2 h-6 w-6 text-blue-500" />
                         )}
                       </div>
                     ))}
@@ -588,57 +590,57 @@ function ClockTrackerInner() {
               <Button
                 onClick={handleClockIn}
                 disabled={loading || !selectedPerson}
-                className={`h-16 text-lg font-semibold transition-all ${
+                className={`h-20 text-xl font-bold transition-all rounded-xl ${
                   canClockIn
                     ? "bg-green-600 hover:bg-green-700 shadow-lg"
                     : "bg-gray-400 cursor-not-allowed"
                 }`}
               >
-                <Timer className="h-5 w-5 mr-2" />
+                <Timer className="h-6 w-6 mr-2" />
                 Entrada
               </Button>
               <Button
                 onClick={handleClockOut}
                 disabled={loading || !canClockOut}
                 variant="destructive"
-                className={`h-16 text-lg font-semibold transition-all ${
+                className={`h-20 text-xl font-bold transition-all rounded-xl ${
                   canClockOut ? "shadow-lg" : "bg-gray-400 cursor-not-allowed"
                 }`}
               >
-                <AlertCircle className="h-5 w-5 mr-2" />
+                <AlertCircle className="h-6 w-6 mr-2" />
                 Salida
               </Button>
             </div>
 
             {/* Status Information */}
             <Card className="bg-gray-50">
-              <CardContent className="pt-4">
+              <CardContent className="pt-5">
                 <div className="space-y-3">
-                  <div className="text-sm text-gray-600">
-                    <p className="font-medium mb-2">Estado actual:</p>
+                  <div className="text-base text-gray-700">
+                    <p className="font-semibold mb-2">Estado actual:</p>
                     {selectedPerson ? (
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         <p className="flex items-center gap-2">
                           <span
-                            className={`w-2 h-2 rounded-full ${
+                            className={`w-3 h-3 rounded-full ${
                               selectedPerson.isActive
                                 ? "bg-green-500"
                                 : "bg-gray-400"
                             }`}
                           ></span>
-                          <strong>{selectedPerson.name}</strong> -{" "}
+                          <strong>{selectedPerson.name}</strong> —{" "}
                           {selectedPerson.isActive ? "Fichado" : "No fichado"}
                         </p>
                         {activePerson &&
                           activePerson.name !== selectedPerson.name && (
-                            <p className="text-orange-600 text-xs">
+                            <p className="text-orange-700 text-sm font-medium">
                               ⚠️ {activePerson.name} está actualmente fichado.
                               Puedes crear un registro histórico.
                             </p>
                           )}
                       </div>
                     ) : (
-                      <p className="text-gray-500">
+                      <p className="text-gray-600">
                         Selecciona un cuidador para continuar
                       </p>
                     )}
@@ -656,9 +658,9 @@ function ClockTrackerInner() {
             <div className="mb-4">
               <Button
                 onClick={() => setShowBatchHistorical(true)}
-                className="w-full bg-blue-600 hover:bg-blue-700"
+                className="w-full bg-blue-600 hover:bg-blue-700 h-14 text-base font-semibold rounded-xl"
               >
-                <Calendar className="h-4 w-4 mr-2" />
+                <Calendar className="h-5 w-5 mr-2" />
                 Agregar Días Pasados por Lote
               </Button>
             </div>
@@ -671,18 +673,18 @@ function ClockTrackerInner() {
 
           {isAdmin && (
             <TabsContent value="admin">
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Shield className="h-5 w-5 text-purple-600" />
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-xl flex items-center gap-2">
+                      <Shield className="h-6 w-6 text-purple-600" />
                       Panel de Administración
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="p-3 bg-purple-50 rounded-lg text-sm text-purple-800">
-                      <p className="font-medium mb-1">Permisos activos:</p>
-                      <ul className="text-xs space-y-0.5 text-purple-600">
+                    <div className="p-4 bg-purple-50 rounded-xl text-base text-purple-900">
+                      <p className="font-semibold mb-2">Permisos activos:</p>
+                      <ul className="text-sm space-y-1 text-purple-700">
                         <li>• Ver montos y liquidación laboral</li>
                         <li>• Marcar registros como pagados/no pagados</li>
                         <li>• Editar cualquier registro de tiempo</li>
@@ -726,13 +728,13 @@ function ClockTrackerInner() {
       <AlertDialog open={showAlert} onOpenChange={setShowAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Notificación</AlertDialogTitle>
-            <AlertDialogDescription className="whitespace-pre-line">
+            <AlertDialogTitle className="text-xl">Notificación</AlertDialogTitle>
+            <AlertDialogDescription className="whitespace-pre-line text-base text-gray-700">
               {alertMessage}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction>Aceptar</AlertDialogAction>
+            <AlertDialogAction className="h-12 text-base px-8">Aceptar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -198,36 +198,36 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
   }, [filteredEntries, parseSpanishDateTime])
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Filters Card */}
       <Card>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
+            <CardTitle className="text-xl flex items-center gap-2">
+              <Calendar className="h-6 w-6" />
               Historial de Registros
             </CardTitle>
-            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading} className="h-11 w-11 p-0">
+              <RefreshCw className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} />
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5">
           {/* Person filter */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">Filtrar por cuidador:</label>
+            <label className="text-base font-semibold text-gray-800 mb-2 block">Filtrar por cuidador:</label>
             {localPeople.length === 0 ? (
-              <div className="flex items-center gap-2 p-3 bg-yellow-50 rounded-lg">
-                <AlertCircle className="h-4 w-4 text-yellow-600" />
-                <span className="text-sm text-yellow-800">No se encontraron cuidadores en la hoja</span>
+              <div className="flex items-center gap-3 p-4 bg-yellow-50 rounded-xl">
+                <AlertCircle className="h-5 w-5 text-yellow-600" />
+                <span className="text-base text-yellow-900">No se encontraron cuidadores en la hoja</span>
               </div>
             ) : (
               <Select value={selectedPerson} onValueChange={setSelectedPerson}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar cuidador" /></SelectTrigger>
+                <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Seleccionar cuidador" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos los cuidadores</SelectItem>
+                  <SelectItem value="all" className="text-base py-3">Todos los cuidadores</SelectItem>
                   {localPeople.map((p) => (
-                    <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+                    <SelectItem key={p.id} value={p.name} className="text-base py-3">{p.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -236,8 +236,8 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
 
           {/* Date filter mode */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
-              <Filter className="h-3.5 w-3.5 inline mr-1" />
+            <label className="text-base font-semibold text-gray-800 mb-2 block">
+              <Filter className="h-4 w-4 inline mr-1" />
               Filtrar por fecha:
             </label>
             <div className="flex gap-2">
@@ -245,9 +245,8 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
                 <Button
                   key={mode}
                   variant={dateFilterMode === mode ? "default" : "outline"}
-                  size="sm"
                   onClick={() => setDateFilterMode(mode)}
-                  className="flex-1"
+                  className="flex-1 h-12 text-base font-medium"
                 >
                   {mode === "month" ? "Mes" : mode === "range" ? "Rango" : "Todo"}
                 </Button>
@@ -257,18 +256,18 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
 
           {/* Month navigator */}
           {dateFilterMode === "month" && (
-            <div className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
-              <Button variant="ghost" size="sm" onClick={goToPrevMonth}>
-                <ChevronLeft className="h-4 w-4" />
+            <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3">
+              <Button variant="ghost" size="sm" onClick={goToPrevMonth} className="h-11 w-11 p-0">
+                <ChevronLeft className="h-6 w-6" />
               </Button>
               <button
                 onClick={goToCurrentMonth}
-                className="text-sm font-semibold text-gray-800 hover:text-blue-600 transition-colors"
+                className="text-lg font-bold text-gray-900 hover:text-blue-600 transition-colors"
               >
                 {MONTH_NAMES[selectedMonth]} {selectedYear}
               </button>
-              <Button variant="ghost" size="sm" onClick={goToNextMonth}>
-                <ChevronRight className="h-4 w-4" />
+              <Button variant="ghost" size="sm" onClick={goToNextMonth} className="h-11 w-11 p-0">
+                <ChevronRight className="h-6 w-6" />
               </Button>
             </div>
           )}
@@ -277,11 +276,11 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
           {dateFilterMode === "range" && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-600 mb-1 block">Desde:</label>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Desde:</label>
                 <Input type="date" value={rangeFrom} onChange={(e) => setRangeFrom(e.target.value)} />
               </div>
               <div>
-                <label className="text-xs text-gray-600 mb-1 block">Hasta:</label>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Hasta:</label>
                 <Input type="date" value={rangeTo} onChange={(e) => setRangeTo(e.target.value)} />
               </div>
             </div>
@@ -289,31 +288,31 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
 
           {/* Person summary */}
           {selectedPerson !== "all" && (
-            <div className="p-4 bg-blue-50 rounded-lg space-y-2">
+            <div className="p-5 bg-blue-50 rounded-xl space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-blue-600" />
-                  <span className="font-medium text-blue-800">{selectedPerson}</span>
+                  <User className="h-5 w-5 text-blue-600" />
+                  <span className="font-semibold text-lg text-blue-900">{selectedPerson}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-blue-600" />
-                  <span className="font-bold text-blue-800">{formatHours(totalHours)}</span>
+                  <Clock className="h-5 w-5 text-blue-600" />
+                  <span className="font-bold text-lg text-blue-900">{formatHours(totalHours)}</span>
                 </div>
               </div>
-              <p className="text-sm text-blue-600">
+              <p className="text-base text-blue-700">
                 {filteredEntries.length} registro{filteredEntries.length !== 1 ? "s" : ""}
               </p>
               {/* Paid/unpaid summary */}
               {(paidSummary.paidCount > 0 || paidSummary.unpaidCount > 0) && (
-                <div className="flex gap-3 pt-1">
+                <div className="flex gap-4 pt-1">
                   {paidSummary.paidCount > 0 && (
-                    <span className="text-xs flex items-center gap-1 text-green-700">
-                      <Check className="h-3 w-3" /> {paidSummary.paidCount} pagado{paidSummary.paidCount !== 1 ? "s" : ""} ({formatHours(paidSummary.paidHours)})
+                    <span className="text-sm flex items-center gap-1.5 text-green-800 font-medium">
+                      <Check className="h-4 w-4" /> {paidSummary.paidCount} pagado{paidSummary.paidCount !== 1 ? "s" : ""} ({formatHours(paidSummary.paidHours)})
                     </span>
                   )}
                   {paidSummary.unpaidCount > 0 && (
-                    <span className="text-xs flex items-center gap-1 text-orange-700">
-                      <CircleDollarSign className="h-3 w-3" /> {paidSummary.unpaidCount} pendiente{paidSummary.unpaidCount !== 1 ? "s" : ""} ({formatHours(paidSummary.unpaidHours)})
+                    <span className="text-sm flex items-center gap-1.5 text-orange-800 font-medium">
+                      <CircleDollarSign className="h-4 w-4" /> {paidSummary.unpaidCount} pendiente{paidSummary.unpaidCount !== 1 ? "s" : ""} ({formatHours(paidSummary.unpaidHours)})
                     </span>
                   )}
                 </div>
@@ -324,69 +323,69 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
           {/* Colombian Labor Law Pay Breakdown */}
           {selectedPerson !== "all" && paySummary && paySummary.totalHours > 0 && (
             <Card className="border-emerald-200 bg-emerald-50">
-              <CardHeader className="pb-2 pt-4 px-4">
-                <CardTitle className="text-sm flex items-center gap-2 text-emerald-800">
-                  {isAdmin ? <DollarSign className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+              <CardHeader className="pb-2 pt-5 px-5">
+                <CardTitle className="text-base flex items-center gap-2 text-emerald-900">
+                  {isAdmin ? <DollarSign className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
                   {isAdmin ? "Liquidación según Ley Laboral Colombiana" : "Desglose de Horas por Tipo"}
                 </CardTitle>
                 {isAdmin && (
-                  <p className="text-xs text-emerald-600">
+                  <p className="text-sm text-emerald-700">
                     SMLMV 2026: {formatCOP(paySummary.monthlyMinWage)} · Valor hora: {formatCOP(Math.round(paySummary.hourlyRate))}
                   </p>
                 )}
               </CardHeader>
-              <CardContent className="px-4 pb-4 space-y-3">
-                <div className="space-y-2">
+              <CardContent className="px-5 pb-5 space-y-3">
+                <div className="space-y-3">
                   {paySummary.hourBreakdown.regularDay > 0 && (
-                    <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center justify-between text-base">
                       <div className="flex items-center gap-2">
-                        <Sun className="h-3.5 w-3.5 text-yellow-600" />
-                        <span className="text-gray-700">Diurnas ordinarias</span>
-                        <span className="text-xs text-gray-500">({formatHours(paySummary.hourBreakdown.regularDay)})</span>
+                        <Sun className="h-5 w-5 text-yellow-600" />
+                        <span className="text-gray-800">Diurnas ordinarias</span>
+                        <span className="text-sm text-gray-600">({formatHours(paySummary.hourBreakdown.regularDay)})</span>
                       </div>
-                      {isAdmin && <span className="font-medium text-gray-800">{formatCOP(paySummary.regularDayPay)}</span>}
+                      {isAdmin && <span className="font-semibold text-gray-900">{formatCOP(paySummary.regularDayPay)}</span>}
                     </div>
                   )}
                   {paySummary.hourBreakdown.regularNight > 0 && (
-                    <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center justify-between text-base">
                       <div className="flex items-center gap-2">
-                        <Moon className="h-3.5 w-3.5 text-indigo-600" />
-                        <span className="text-gray-700">Nocturnas +35%</span>
-                        <span className="text-xs text-gray-500">({formatHours(paySummary.hourBreakdown.regularNight)})</span>
+                        <Moon className="h-5 w-5 text-indigo-600" />
+                        <span className="text-gray-800">Nocturnas +35%</span>
+                        <span className="text-sm text-gray-600">({formatHours(paySummary.hourBreakdown.regularNight)})</span>
                       </div>
-                      {isAdmin && <span className="font-medium text-gray-800">{formatCOP(paySummary.regularNightPay)}</span>}
+                      {isAdmin && <span className="font-semibold text-gray-900">{formatCOP(paySummary.regularNightPay)}</span>}
                     </div>
                   )}
                   {paySummary.hourBreakdown.sundayHolidayDay > 0 && (
-                    <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center justify-between text-base">
                       <div className="flex items-center gap-2">
-                        <PartyPopper className="h-3.5 w-3.5 text-orange-600" />
-                        <span className="text-gray-700">Dom/Festivo diurno +80%</span>
-                        <span className="text-xs text-gray-500">({formatHours(paySummary.hourBreakdown.sundayHolidayDay)})</span>
+                        <PartyPopper className="h-5 w-5 text-orange-600" />
+                        <span className="text-gray-800">Dom/Festivo diurno</span>
+                        <span className="text-sm text-gray-600">({formatHours(paySummary.hourBreakdown.sundayHolidayDay)})</span>
                       </div>
-                      {isAdmin && <span className="font-medium text-gray-800">{formatCOP(paySummary.sundayHolidayDayPay)}</span>}
+                      {isAdmin && <span className="font-semibold text-gray-900">{formatCOP(paySummary.sundayHolidayDayPay)}</span>}
                     </div>
                   )}
                   {paySummary.hourBreakdown.sundayHolidayNight > 0 && (
-                    <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center justify-between text-base">
                       <div className="flex items-center gap-2">
-                        <Moon className="h-3.5 w-3.5 text-purple-600" />
-                        <span className="text-gray-700">Dom/Festivo nocturno +110%</span>
-                        <span className="text-xs text-gray-500">({formatHours(paySummary.hourBreakdown.sundayHolidayNight)})</span>
+                        <Moon className="h-5 w-5 text-purple-600" />
+                        <span className="text-gray-800">Dom/Festivo nocturno</span>
+                        <span className="text-sm text-gray-600">({formatHours(paySummary.hourBreakdown.sundayHolidayNight)})</span>
                       </div>
-                      {isAdmin && <span className="font-medium text-gray-800">{formatCOP(paySummary.sundayHolidayNightPay)}</span>}
+                      {isAdmin && <span className="font-semibold text-gray-900">{formatCOP(paySummary.sundayHolidayNightPay)}</span>}
                     </div>
                   )}
                 </div>
                 {isAdmin && (
                   <>
-                    <div className="pt-2 border-t border-emerald-200">
+                    <div className="pt-3 border-t border-emerald-200">
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-emerald-800">Total a pagar</span>
-                        <span className="font-bold text-lg text-emerald-700">{formatCOP(paySummary.totalPay)}</span>
+                        <span className="font-bold text-lg text-emerald-900">Total a pagar</span>
+                        <span className="font-bold text-xl text-emerald-700">{formatCOP(paySummary.totalPay)}</span>
                       </div>
                     </div>
-                    <p className="text-[10px] text-emerald-600 leading-tight">
+                    <p className="text-xs text-emerald-700 leading-relaxed">
                       * Cálculo basado en salario mínimo 2026 y Ley 2466/2025. Recargo nocturno desde las 7:00 PM. Dominicales/festivos +80% (hasta Jul 2026), +90% (desde Jul 2026). No incluye prestaciones sociales ni parafiscales.
                     </p>
                   </>
@@ -398,23 +397,23 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
       </Card>
 
       {/* Records List */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         {loading && localEntries.length === 0 ? (
           <Card>
             <CardContent className="pt-6">
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="text-sm text-gray-600 mt-2">Cargando registros...</p>
+              <div className="text-center py-10">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="text-base text-gray-700 mt-3">Cargando registros...</p>
               </div>
             </CardContent>
           </Card>
         ) : sortedEntries.length === 0 ? (
           <Card>
             <CardContent className="pt-6">
-              <div className="text-center py-8">
-                <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">No hay registros para mostrar</p>
-                <p className="text-sm text-gray-500 mt-1">
+              <div className="text-center py-10">
+                <Calendar className="h-14 w-14 text-gray-400 mx-auto mb-4" />
+                <p className="text-lg text-gray-700">No hay registros para mostrar</p>
+                <p className="text-base text-gray-500 mt-2">
                   {dateFilterMode === "month"
                     ? `No hay registros en ${MONTH_NAMES[selectedMonth]} ${selectedYear}`
                     : selectedPerson === "all"
@@ -442,33 +441,33 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
                     : ""
                 }
               >
-                <CardContent className="pt-4">
-                  <div className="space-y-3">
+                <CardContent className="pt-5 pb-5">
+                  <div className="space-y-4">
                     {/* Header */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                        <span className="font-medium">{entry.personName}</span>
-                        {isActive && <Badge className="bg-green-100 text-green-800">Activo</Badge>}
+                        <div className="w-4 h-4 rounded-full bg-blue-500"></div>
+                        <span className="font-semibold text-lg text-gray-900">{entry.personName}</span>
+                        {isActive && <Badge className="bg-green-100 text-green-800 text-sm px-2">Activo</Badge>}
                         {!isActive && entry.paid && (
-                          <Badge className="bg-emerald-100 text-emerald-700 text-[10px]">Pagado</Badge>
+                          <Badge className="bg-emerald-100 text-emerald-700 text-xs px-2">Pagado</Badge>
                         )}
                         {!isActive && !entry.paid && (
-                          <Badge variant="outline" className="text-orange-600 border-orange-300 text-[10px]">Pendiente</Badge>
+                          <Badge variant="outline" className="text-orange-700 border-orange-400 text-xs px-2">Pendiente</Badge>
                         )}
                       </div>
-                      <span className="text-sm text-gray-500">{clockInFormatted.date}</span>
+                      <span className="text-base text-gray-600 font-medium">{clockInFormatted.date}</span>
                     </div>
 
                     {/* Times */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <p className="text-xs text-gray-600 uppercase tracking-wide">Entrada</p>
-                        <p className="font-mono text-sm font-medium">{clockInFormatted.time}</p>
+                        <p className="text-sm text-gray-600 uppercase tracking-wide font-medium">Entrada</p>
+                        <p className="font-mono text-xl font-bold text-gray-900">{clockInFormatted.time}</p>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-xs text-gray-600 uppercase tracking-wide">Salida</p>
-                        <p className="font-mono text-sm font-medium">
+                        <p className="text-sm text-gray-600 uppercase tracking-wide font-medium">Salida</p>
+                        <p className="font-mono text-xl font-bold text-gray-900">
                           {clockOutFormatted ? clockOutFormatted.time : "En curso..."}
                         </p>
                       </div>
@@ -476,10 +475,10 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
 
                     {/* Total hours + paid toggle */}
                     {entry.totalHours !== undefined && (
-                      <div className="pt-2 border-t border-gray-200">
+                      <div className="pt-3 border-t border-gray-200">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">Tiempo total:</span>
-                          <span className="font-semibold text-blue-600">{formatHours(entry.totalHours)}</span>
+                          <span className="text-base text-gray-700">Tiempo total:</span>
+                          <span className="font-bold text-lg text-blue-600">{formatHours(entry.totalHours)}</span>
                         </div>
                       </div>
                     )}
@@ -488,8 +487,7 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
                     {!isActive && isAdmin && (
                       <Button
                         variant={entry.paid ? "outline" : "default"}
-                        size="sm"
-                        className={`w-full text-xs ${
+                        className={`w-full h-12 text-base font-medium ${
                           entry.paid
                             ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
                             : "bg-orange-500 hover:bg-orange-600 text-white"
@@ -498,11 +496,11 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
                         onClick={() => handleTogglePaid(entry)}
                       >
                         {isToggling ? (
-                          <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+                          <RefreshCw className="h-5 w-5 animate-spin mr-2" />
                         ) : entry.paid ? (
-                          <Check className="h-3 w-3 mr-1" />
+                          <Check className="h-5 w-5 mr-2" />
                         ) : (
-                          <CircleDollarSign className="h-3 w-3 mr-1" />
+                          <CircleDollarSign className="h-5 w-5 mr-2" />
                         )}
                         {entry.paid ? "Pagado ✓" : "Marcar como pagado"}
                       </Button>
@@ -518,15 +516,15 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
       {/* Total summary for all */}
       {filteredEntries.length > 0 && (
         <Card className="bg-gray-50">
-          <CardContent className="pt-4">
+          <CardContent className="pt-5 pb-5">
             <div className="flex items-center justify-between">
-              <span className="font-medium text-gray-700">Total general:</span>
+              <span className="font-semibold text-lg text-gray-800">Total general:</span>
               <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-gray-600" />
-                <span className="font-bold text-gray-800">{formatHours(totalHours)}</span>
+                <Clock className="h-5 w-5 text-gray-700" />
+                <span className="font-bold text-xl text-gray-900">{formatHours(totalHours)}</span>
               </div>
             </div>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-base text-gray-600 mt-1">
               {filteredEntries.length} registro{filteredEntries.length !== 1 ? "s" : ""} en total
             </p>
           </CardContent>

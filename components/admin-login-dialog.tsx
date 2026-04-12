@@ -56,9 +56,9 @@ export function AdminLoginDialog({ open, onOpenChange }: AdminLoginDialogProps) 
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <Label htmlFor="admin-password">Contraseña</Label>
+            <Label htmlFor="admin-password" className="text-base">Contraseña</Label>
             <Input
               id="admin-password"
               type="password"
@@ -66,22 +66,22 @@ export function AdminLoginDialog({ open, onOpenChange }: AdminLoginDialogProps) 
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               autoFocus
-              className="mt-1"
+              className="mt-2 text-lg h-14"
             />
           </div>
 
           {error && (
             <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertTriangle className="h-5 w-5" />
+              <AlertDescription className="text-base">{error}</AlertDescription>
             </Alert>
           )}
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose}>
+            <Button type="button" variant="outline" onClick={handleClose} className="h-12 text-base">
               Cancelar
             </Button>
-            <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
+            <Button type="submit" className="bg-purple-600 hover:bg-purple-700 h-12 text-base">
               Ingresar
             </Button>
           </DialogFooter>

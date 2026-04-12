@@ -55,9 +55,9 @@ export function AdminAlertsPanel() {
     return (
       <Card>
         <CardContent className="pt-6">
-          <div className="text-center py-6">
-            <Bell className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500 text-sm">No hay alertas</p>
+          <div className="text-center py-8">
+            <Bell className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-600 text-base">No hay alertas</p>
           </div>
         </CardContent>
       </Card>
@@ -65,17 +65,17 @@ export function AdminAlertsPanel() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Bell className="h-5 w-5 text-orange-600" />
-          <span className="font-medium text-sm">
+          <Bell className="h-6 w-6 text-orange-600" />
+          <span className="font-semibold text-base">
             Alertas ({unresolvedCount} pendiente{unresolvedCount !== 1 ? "s" : ""})
           </span>
         </div>
         {alerts.some((a) => a.resolved) && (
-          <Button variant="ghost" size="sm" onClick={clearAlerts} className="text-xs text-gray-500">
-            <Trash2 className="h-3 w-3 mr-1" />
+          <Button variant="ghost" size="sm" onClick={clearAlerts} className="text-sm text-gray-600">
+            <Trash2 className="h-4 w-4 mr-1" />
             Limpiar resueltas
           </Button>
         )}
@@ -86,15 +86,15 @@ export function AdminAlertsPanel() {
           key={alert.id}
           className={`${alert.resolved ? "opacity-50" : ""} ${getAlertColor(alert.type)}`}
         >
-          <CardContent className="pt-3 pb-3">
-            <div className="flex items-start gap-2">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-start gap-3">
               {getAlertIcon(alert.type)}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="outline" className="text-[10px]">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Badge variant="outline" className="text-xs">
                     {getAlertLabel(alert.type)}
                   </Badge>
-                  <span className="text-[10px] text-gray-500">
+                  <span className="text-xs text-gray-600">
                     {new Date(alert.timestamp).toLocaleDateString("es-ES", {
                       day: "numeric",
                       month: "short",
@@ -103,11 +103,11 @@ export function AdminAlertsPanel() {
                     })}
                   </span>
                   {alert.resolved && (
-                    <Badge className="bg-green-100 text-green-700 text-[10px]">Resuelta</Badge>
+                    <Badge className="bg-green-100 text-green-700 text-xs">Resuelta</Badge>
                   )}
                 </div>
-                <p className="text-xs text-gray-700">{alert.message}</p>
-                <p className="text-[10px] text-gray-500 mt-0.5">
+                <p className="text-sm text-gray-800">{alert.message}</p>
+                <p className="text-xs text-gray-600 mt-1">
                   {alert.personName}
                   {alert.otherPerson ? ` ↔ ${alert.otherPerson}` : ""} · {alert.date}
                 </p>
@@ -116,11 +116,11 @@ export function AdminAlertsPanel() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 w-7 p-0 text-green-600 hover:text-green-700"
+                  className="h-10 w-10 p-0 text-green-600 hover:text-green-700"
                   onClick={() => resolveAlert(alert.id)}
                   title="Marcar como resuelta"
                 >
-                  <Check className="h-4 w-4" />
+                  <Check className="h-5 w-5" />
                 </Button>
               )}
             </div>

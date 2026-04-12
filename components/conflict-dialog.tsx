@@ -50,16 +50,16 @@ export function ConflictDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {samePersonConflicts.length > 0 && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm font-medium text-red-700">
-                <UserX className="h-4 w-4" />
+              <div className="flex items-center gap-2 text-base font-semibold text-red-700">
+                <UserX className="h-5 w-5" />
                 Cruce con tus propios registros
               </div>
               {samePersonConflicts.map((c, i) => (
-                <Alert key={i} variant="destructive" className="py-2">
-                  <AlertDescription className="text-xs">
+                <Alert key={i} variant="destructive" className="py-3">
+                  <AlertDescription className="text-sm">
                     {formatConflictMessage(c)}
                   </AlertDescription>
                 </Alert>
@@ -69,13 +69,13 @@ export function ConflictDialog({
 
           {crossPersonConflicts.length > 0 && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm font-medium text-orange-700">
-                <Users className="h-4 w-4" />
+              <div className="flex items-center gap-2 text-base font-semibold text-orange-700">
+                <Users className="h-5 w-5" />
                 Cruce con otro cuidador
               </div>
               {crossPersonConflicts.map((c, i) => (
-                <Alert key={i} className="py-2 border-orange-200 bg-orange-50">
-                  <AlertDescription className="text-xs text-orange-800">
+                <Alert key={i} className="py-3 border-orange-200 bg-orange-50">
+                  <AlertDescription className="text-sm text-orange-900">
                     {formatConflictMessage(c)}
                   </AlertDescription>
                 </Alert>
@@ -83,8 +83,8 @@ export function ConflictDialog({
             </div>
           )}
 
-          <div className="p-3 bg-gray-50 rounded-lg text-xs text-gray-600 space-y-1">
-            <p className="font-medium">¿Qué deseas hacer?</p>
+          <div className="p-4 bg-gray-50 rounded-xl text-sm text-gray-700 space-y-2">
+            <p className="font-semibold text-base">¿Qué deseas hacer?</p>
             <p>• Ajustar horario: vuelve a editar las horas para evitar el cruce</p>
             {crossPersonConflicts.length > 0 && (
               <p>• Continuar y alertar: guarda el registro y notifica al administrador del cruce</p>
@@ -93,19 +93,19 @@ export function ConflictDialog({
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
-          <Button variant="outline" onClick={onCancel} className="sm:order-1">
+          <Button variant="outline" onClick={onCancel} className="sm:order-1 h-12 text-base">
             Cancelar
           </Button>
-          <Button onClick={onAdjust} className="bg-blue-600 hover:bg-blue-700 sm:order-2">
+          <Button onClick={onAdjust} className="bg-blue-600 hover:bg-blue-700 sm:order-2 h-12 text-base">
             Ajustar Horario
           </Button>
           {crossPersonConflicts.length > 0 && samePersonConflicts.length === 0 && (
             <Button
               onClick={onForceWithAlert}
               variant="outline"
-              className="border-orange-300 text-orange-700 hover:bg-orange-50 sm:order-3"
+              className="border-orange-300 text-orange-700 hover:bg-orange-50 sm:order-3 h-12 text-sm"
             >
-              <ArrowRight className="h-4 w-4 mr-1" />
+              <ArrowRight className="h-5 w-5 mr-1" />
               Continuar y Alertar Admin
             </Button>
           )}
