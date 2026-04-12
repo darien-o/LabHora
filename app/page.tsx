@@ -16,12 +16,18 @@ import {
   RefreshCw,
   CalendarDays,
   Calendar,
+  Shield,
+  ShieldOff,
+  Bell,
 } from "lucide-react";
 import { ConfirmClockOutDialog } from "@/components/confirm-clock-out-dialog";
 import { HistoricalEntryDialog } from "@/components/historical-entry-dialog";
 import { BatchHistoricalDialog } from "@/components/batch-historical-dialog";
 import { HistoryView } from "@/components/history-view";
 import { ScheduleView } from "@/components/schedule-view";
+import { AdminLoginDialog } from "@/components/admin-login-dialog";
+import { AdminAlertsPanel } from "@/components/admin-alerts-panel";
+import { AdminProvider, useAdmin } from "@/lib/admin-context";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,6 +66,15 @@ interface TimeEntry {
 }
 
 export default function ClockTracker() {
+  return (
+    <AdminProvider>
+      <ClockTrackerInner />
+    </AdminProvider>
+  );
+}
+
+function ClockTrackerInner() {
+  const { isAdmin, logout, alerts } = useAdmin();
   const [people, setPeople] = useState<Person[]>([]);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
@@ -72,6 +87,9 @@ export default function ClockTracker() {
   const [alertMessage, setAlertMessage] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
   const [activeTab, setActiveTab] = useState("clock");
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+
+  const unresolvedAlerts = alerts.filter((a) => !a.resolved).length;
 
   // Update current time every second for real-time clock
   useEffect(() => {
@@ -342,12 +360,59 @@ export default function ClockTracker() {
         {/* Header */}
         <Card className="text-center">
           <CardHeader className="pb-4">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <Clock className="h-6 w-6 text-blue-600" />
-              <CardTitle className="text-2xl font-bold text-gray-800">
-                Control de Horarios
-              </CardTitle>
+            <div className="flex items-center justify-between mb-2">
+              <div className="w-10" /> {/* spacer */}
+              <div className="flex items-center justify-center gap-2">
+                <Clock className="h-6 w-6 text-blue-600" />
+                <CardTitle className="text-2xl font-bold text-gray-800">
+                  Control de Horarios
+                </CardTitle>
+              </div>
+              <div className="flex items-center gap-1">
+                {isAdmin && unresolvedAlerts > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="relative h-8 w-8 p-0"
+                    onClick={() => setActiveTab("admin")}
+                  >
+                    <Bell className="h-4 w-4 text-orange-600" />
+                    <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
+                      {unresolvedAlerts}
+                    </span>
+                  </Button>
+                )}
+                {isAdmin ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={logout}
+                    className="h-8 w-8 p-0 text-purple-600"
+                    title="Cerrar sesión admin"
+                  >
+                    <ShieldOff className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowAdminLogin(true)}
+                    className="h-8 w-8 p-0 text-gray-400 hover:text-purple-600"
+                    title="Acceso admin"
+                  >
+                    <Shield className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
+            {isAdmin && (
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <Badge className="bg-purple-100 text-purple-700 text-[10px]">
+                  <Shield className="h-3 w-3 mr-1" />
+                  Admin
+                </Badge>
+              </div>
+            )}
             <div className="space-y-1">
               <p className="text-3xl font-mono font-bold text-blue-600">
                 {formatTime(currentTime)}
@@ -359,7 +424,7 @@ export default function ClockTracker() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className={`grid w-full ${isAdmin ? "grid-cols-4" : "grid-cols-3"}`}>
             <TabsTrigger value="clock" className="flex items-center gap-1 text-xs">
               <Timer className="h-4 w-4" />
               Fichar
@@ -372,6 +437,17 @@ export default function ClockTracker() {
               <History className="h-4 w-4" />
               Historial
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="admin" className="flex items-center gap-1 text-xs relative">
+                <Shield className="h-4 w-4" />
+                Admin
+                {unresolvedAlerts > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
+                    {unresolvedAlerts}
+                  </span>
+                )}
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="clock" className="space-y-6">
@@ -592,6 +668,33 @@ export default function ClockTracker() {
               onRefresh={loadTimeEntries}
             />
           </TabsContent>
+
+          {isAdmin && (
+            <TabsContent value="admin">
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Shield className="h-5 w-5 text-purple-600" />
+                      Panel de Administración
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="p-3 bg-purple-50 rounded-lg text-sm text-purple-800">
+                      <p className="font-medium mb-1">Permisos activos:</p>
+                      <ul className="text-xs space-y-0.5 text-purple-600">
+                        <li>• Ver montos y liquidación laboral</li>
+                        <li>• Marcar registros como pagados/no pagados</li>
+                        <li>• Editar cualquier registro de tiempo</li>
+                        <li>• Ver alertas de cruces de horario</li>
+                      </ul>
+                    </div>
+                  </CardContent>
+                </Card>
+                <AdminAlertsPanel />
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 
@@ -633,6 +736,11 @@ export default function ClockTracker() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AdminLoginDialog
+        open={showAdminLogin}
+        onOpenChange={setShowAdminLogin}
+      />
     </div>
   );
 }

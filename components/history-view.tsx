@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { calculatePaySummary, formatCOP, type PaySummary } from "@/lib/colombian-labor"
 import { fetchPeople, fetchTimeEntries, postTogglePaid } from "@/lib/api-client"
+import { useAdmin } from "@/lib/admin-context"
 
 interface TimeEntry {
   id: string
@@ -44,6 +45,7 @@ const MONTH_NAMES = [
 ]
 
 export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps) {
+  const { isAdmin } = useAdmin()
   const [selectedPerson, setSelectedPerson] = useState<string>("all")
   const [loading, setLoading] = useState(false)
   const [localPeople, setLocalPeople] = useState<Person[]>([])
@@ -324,12 +326,14 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
             <Card className="border-emerald-200 bg-emerald-50">
               <CardHeader className="pb-2 pt-4 px-4">
                 <CardTitle className="text-sm flex items-center gap-2 text-emerald-800">
-                  <DollarSign className="h-4 w-4" />
-                  Liquidación según Ley Laboral Colombiana
+                  {isAdmin ? <DollarSign className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+                  {isAdmin ? "Liquidación según Ley Laboral Colombiana" : "Desglose de Horas por Tipo"}
                 </CardTitle>
-                <p className="text-xs text-emerald-600">
-                  SMLMV 2026: {formatCOP(paySummary.monthlyMinWage)} · Valor hora: {formatCOP(Math.round(paySummary.hourlyRate))}
-                </p>
+                {isAdmin && (
+                  <p className="text-xs text-emerald-600">
+                    SMLMV 2026: {formatCOP(paySummary.monthlyMinWage)} · Valor hora: {formatCOP(Math.round(paySummary.hourlyRate))}
+                  </p>
+                )}
               </CardHeader>
               <CardContent className="px-4 pb-4 space-y-3">
                 <div className="space-y-2">
@@ -340,7 +344,7 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
                         <span className="text-gray-700">Diurnas ordinarias</span>
                         <span className="text-xs text-gray-500">({formatHours(paySummary.hourBreakdown.regularDay)})</span>
                       </div>
-                      <span className="font-medium text-gray-800">{formatCOP(paySummary.regularDayPay)}</span>
+                      {isAdmin && <span className="font-medium text-gray-800">{formatCOP(paySummary.regularDayPay)}</span>}
                     </div>
                   )}
                   {paySummary.hourBreakdown.regularNight > 0 && (
@@ -350,7 +354,7 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
                         <span className="text-gray-700">Nocturnas +35%</span>
                         <span className="text-xs text-gray-500">({formatHours(paySummary.hourBreakdown.regularNight)})</span>
                       </div>
-                      <span className="font-medium text-gray-800">{formatCOP(paySummary.regularNightPay)}</span>
+                      {isAdmin && <span className="font-medium text-gray-800">{formatCOP(paySummary.regularNightPay)}</span>}
                     </div>
                   )}
                   {paySummary.hourBreakdown.sundayHolidayDay > 0 && (
@@ -360,7 +364,7 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
                         <span className="text-gray-700">Dom/Festivo diurno +80%</span>
                         <span className="text-xs text-gray-500">({formatHours(paySummary.hourBreakdown.sundayHolidayDay)})</span>
                       </div>
-                      <span className="font-medium text-gray-800">{formatCOP(paySummary.sundayHolidayDayPay)}</span>
+                      {isAdmin && <span className="font-medium text-gray-800">{formatCOP(paySummary.sundayHolidayDayPay)}</span>}
                     </div>
                   )}
                   {paySummary.hourBreakdown.sundayHolidayNight > 0 && (
@@ -370,19 +374,23 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
                         <span className="text-gray-700">Dom/Festivo nocturno +110%</span>
                         <span className="text-xs text-gray-500">({formatHours(paySummary.hourBreakdown.sundayHolidayNight)})</span>
                       </div>
-                      <span className="font-medium text-gray-800">{formatCOP(paySummary.sundayHolidayNightPay)}</span>
+                      {isAdmin && <span className="font-medium text-gray-800">{formatCOP(paySummary.sundayHolidayNightPay)}</span>}
                     </div>
                   )}
                 </div>
-                <div className="pt-2 border-t border-emerald-200">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-emerald-800">Total a pagar</span>
-                    <span className="font-bold text-lg text-emerald-700">{formatCOP(paySummary.totalPay)}</span>
-                  </div>
-                </div>
-                <p className="text-[10px] text-emerald-600 leading-tight">
-                  * Cálculo basado en salario mínimo 2026 y Ley 2466/2025. Recargo nocturno desde las 7:00 PM. Dominicales/festivos +80% (hasta Jul 2026), +90% (desde Jul 2026). No incluye prestaciones sociales ni parafiscales.
-                </p>
+                {isAdmin && (
+                  <>
+                    <div className="pt-2 border-t border-emerald-200">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-emerald-800">Total a pagar</span>
+                        <span className="font-bold text-lg text-emerald-700">{formatCOP(paySummary.totalPay)}</span>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-emerald-600 leading-tight">
+                      * Cálculo basado en salario mínimo 2026 y Ley 2466/2025. Recargo nocturno desde las 7:00 PM. Dominicales/festivos +80% (hasta Jul 2026), +90% (desde Jul 2026). No incluye prestaciones sociales ni parafiscales.
+                    </p>
+                  </>
+                )}
               </CardContent>
             </Card>
           )}
@@ -477,7 +485,7 @@ export function HistoryView({ timeEntries, people, onRefresh }: HistoryViewProps
                     )}
 
                     {/* Paid toggle button */}
-                    {!isActive && (
+                    {!isActive && isAdmin && (
                       <Button
                         variant={entry.paid ? "outline" : "default"}
                         size="sm"

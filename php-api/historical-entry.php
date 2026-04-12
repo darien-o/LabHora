@@ -26,10 +26,10 @@ try {
     $newStart = new DateTime($clockIn);
     $newEnd = new DateTime($clockOut);
 
+    $conflicts = [];
     for ($i = 1; $i < count($rows); $i++) {
         $r = $rows[$i];
         if (empty($r[0]) || empty($r[2])) continue;
-        if ($r[2] !== $personName) continue;
 
         $entryStart = parse_spanish_datetime($r[0]);
         $entryEnd = !empty($r[1]) ? parse_spanish_datetime($r[1]) : new DateTime();
@@ -38,10 +38,22 @@ try {
             $startStr = $entryStart->format('d/m/Y H:i');
             $endStr = $entryEnd->format('H:i');
             $suffix = empty($r[1]) ? ' (en curso)' : '';
-            json_error(
-                "$personName ya tiene un registro desde $startStr hasta $endStr$suffix.",
-                400
-            );
+
+            // Same person overlap is a hard block
+            if ($r[2] === $personName) {
+                json_error(
+                    "$personName ya tiene un registro desde $startStr hasta $endStr$suffix.",
+                    400
+                );
+            }
+
+            // Cross-person overlap: collect as warning but allow
+            $conflicts[] = [
+                'person' => $r[2],
+                'start' => $startStr,
+                'end' => $endStr,
+                'active' => empty($r[1]),
+            ];
         }
     }
 
@@ -65,6 +77,7 @@ try {
         'success' => true,
         'message' => 'Entrada histórica agregada correctamente',
         'data' => ['personName' => $personName, 'clockIn' => $clockIn, 'clockOut' => $clockOut],
+        'warnings' => $conflicts,
     ]);
 } catch (Exception $e) {
     json_error('Error al agregar entrada histórica: ' . $e->getMessage());
