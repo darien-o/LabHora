@@ -455,7 +455,7 @@ function ClockTrackerInner() {
                 <Calendar className="h-5 w-5 mr-2" />Agregar Días Pasados por Lote
               </Button>
             </div>
-            <HistoryView timeEntries={timeEntries} people={people} onRefresh={loadTimeEntries} />
+            <HistoryView timeEntries={timeEntries} people={people} onRefresh={loadTimeEntries} currentPersonName={profileName || undefined} />
           </TabsContent>
 
           {isAdmin && (

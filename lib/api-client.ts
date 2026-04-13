@@ -137,3 +137,27 @@ export async function uploadPhoto(file: File, personName: string, note?: string)
   if (!res.ok) throw new Error(data.error || "Error al subir foto")
   return data
 }
+
+// --- Edit/Delete entry ---
+
+export async function postEditEntry(rowIndex: number, clockIn: string, clockOut: string) {
+  const res = await fetch(url("edit-entry"), {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ action: "edit", rowIndex, clockIn, clockOut }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || "Error al editar registro")
+  return data
+}
+
+export async function postDeleteEntry(rowIndex: number) {
+  const res = await fetch(url("edit-entry"), {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ action: "delete", rowIndex }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || "Error al eliminar registro")
+  return data
+}
