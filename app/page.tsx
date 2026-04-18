@@ -18,6 +18,7 @@ import { HistoryView } from "@/components/history-view";
 import { ScheduleView } from "@/components/schedule-view";
 import { AdminLoginDialog } from "@/components/admin-login-dialog";
 import { AdminAlertsPanel } from "@/components/admin-alerts-panel";
+import { AdminRecaudos } from "@/components/admin-recaudos";
 import { ProfileSelector } from "@/components/profile-selector";
 import { AdminProvider, useAdmin } from "@/lib/admin-context";
 import { MarujitaIcon } from "@/components/marujita-icon";
@@ -34,11 +35,13 @@ interface Person {
 interface TimeEntry {
   id: string; rowIndex: number; personName: string; clockIn: string;
   clockOut?: string; totalHours?: number; paid: boolean; date: string;
+  hourlyValue?: number;
 }
 
 const PROFILE_KEY = "marujita_profile";
 const LONG_SHIFT_HOURS = 10;
 const MAX_SHIFT_HOURS = 15;
+const ABNORMAL_HOURS = 16; // flag completed entries over this
 
 export default function ClockTracker() {
   return <AdminProvider><ClockTrackerInner /></AdminProvider>;
@@ -109,6 +112,29 @@ function ClockTrackerInner() {
     const interval = setInterval(check, 60000);
     return () => clearInterval(interval);
   }, [selectedPerson]);
+
+  // Scan completed entries for abnormal durations (>16h)
+  useEffect(() => {
+    if (timeEntries.length === 0) return;
+    const ALERTED_KEY = "marujita_abnormal_alerted";
+    const alerted = new Set<string>(JSON.parse(localStorage.getItem(ALERTED_KEY) || "[]"));
+
+    for (const entry of timeEntries) {
+      if (!entry.clockOut || !entry.totalHours) continue;
+      if (entry.totalHours <= ABNORMAL_HOURS) continue;
+      if (alerted.has(entry.id)) continue;
+
+      addAlert({
+        type: "inconsistency",
+        message: `Registro de ${entry.personName} con ${Math.round(entry.totalHours * 10) / 10} horas (${entry.date}). Esto parece anormal — posiblemente olvidó marcar salida.`,
+        personName: entry.personName,
+        date: entry.date,
+      });
+      alerted.add(entry.id);
+    }
+
+    localStorage.setItem(ALERTED_KEY, JSON.stringify([...alerted]));
+  }, [timeEntries]);
 
   const handleProfileSelect = (person: { id: string; name: string }) => {
     localStorage.setItem(PROFILE_KEY, person.name);
@@ -468,10 +494,11 @@ function ClockTrackerInner() {
                       <li>• Ver montos y liquidación laboral</li>
                       <li>• Marcar registros como pagados/no pagados</li>
                       <li>• Editar cualquier registro de tiempo</li>
-                      <li>• Ver alertas de cruces de horario</li>
+                      <li>• Gestionar recaudos mensuales</li>
                     </ul>
                   </div></CardContent>
                 </Card>
+                <AdminRecaudos />
                 <AdminAlertsPanel />
               </div>
             </TabsContent>

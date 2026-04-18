@@ -161,3 +161,32 @@ export async function postDeleteEntry(rowIndex: number) {
   if (!res.ok) throw new Error(data.error || "Error al eliminar registro")
   return data
 }
+
+// --- Recaudos (monthly collections) ---
+
+export async function fetchRecaudos() {
+  const base = url("recaudos")
+  const sep = base.includes("?") ? "&" : "?"
+  const res = await fetch(`${base}${sep}_t=${Date.now()}`, {
+    cache: "no-store",
+    headers: NO_CACHE_HEADERS,
+  })
+  return res.json()
+}
+
+export async function postRecaudo(data: {
+  action: "add" | "edit" | "delete"
+  month?: string
+  amount?: number
+  description?: string
+  rowIndex?: number
+}) {
+  const res = await fetch(url("recaudos"), {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(data),
+  })
+  const result = await res.json()
+  if (!res.ok) throw new Error(result.error || "Error en recaudos")
+  return result
+}

@@ -18,18 +18,22 @@ import {
 import {
   RefreshCw, Clock, Calendar, User, AlertCircle, DollarSign,
   Moon, Sun, PartyPopper, ChevronLeft, ChevronRight, Check,
-  Filter, CircleDollarSign, Pencil, Trash2,
+  Filter, CircleDollarSign, Pencil, Trash2, Wallet, Scale,
 } from "lucide-react"
 import { calculatePaySummary, formatCOP, type PaySummary } from "@/lib/colombian-labor"
-import { fetchPeople, fetchTimeEntries, postTogglePaid, postEditEntry, postDeleteEntry } from "@/lib/api-client"
+import { fetchPeople, fetchTimeEntries, postTogglePaid, postEditEntry, postDeleteEntry, fetchRecaudos } from "@/lib/api-client"
 import { useAdmin } from "@/lib/admin-context"
 
 interface TimeEntry {
   id: string; rowIndex: number; personName: string; clockIn: string;
   clockOut?: string; totalHours?: number; paid: boolean; date: string;
+  hourlyValue?: number;
 }
-interface Person { id: string; name: string }
+interface Person { id: string; name: string; isFixed?: boolean; fixedRate?: number | null }
 type DateFilterMode = "month" | "range" | "all"
+type PayMode = "law" | "custom"
+
+interface Recaudo { rowIndex: number; month: string; amount: number; description: string }
 
 interface HistoryViewProps {
   timeEntries: TimeEntry[]
@@ -69,8 +73,13 @@ export function HistoryView({ timeEntries, people, onRefresh, currentPersonName 
   const [deleteEntry, setDeleteEntry] = useState<TimeEntry | null>(null)
   const [deleteSaving, setDeleteSaving] = useState(false)
 
+  // Pay mode toggle (admin only)
+  const [payMode, setPayMode] = useState<PayMode>("custom")
+  const [recaudos, setRecaudos] = useState<Recaudo[]>([])
+
   useEffect(() => { loadFreshData() }, [])
   useEffect(() => { setLocalPeople(people); setLocalEntries(timeEntries) }, [people, timeEntries])
+  useEffect(() => { if (isAdmin) loadRecaudos() }, [isAdmin])
 
   const loadFreshData = async () => {
     setLoading(true)
@@ -79,6 +88,13 @@ export function HistoryView({ timeEntries, people, onRefresh, currentPersonName 
       if (!pd.error) setLocalPeople(pd)
       if (!ed.error) setLocalEntries(ed)
     } catch {} finally { setLoading(false) }
+  }
+
+  const loadRecaudos = async () => {
+    try {
+      const data = await fetchRecaudos()
+      if (!data.error) setRecaudos(data)
+    } catch {}
   }
 
   const parseSpanishDateTime = useCallback((s: string): Date => {
@@ -126,6 +142,55 @@ export function HistoryView({ timeEntries, people, onRefresh, currentPersonName 
       unpaidHours: unpaid.reduce((t, e) => t + (e.totalHours || 0), 0),
     }
   }, [filteredEntries])
+
+  // Custom pay calculation based on recaudos
+  const customPaySummary = useMemo(() => {
+    if (selectedPerson === "all" || !isAdmin) return null
+    const completed = filteredEntries.filter((e) => e.clockIn && e.clockOut && e.totalHours)
+    if (!completed.length) return null
+
+    const personInfo = localPeople.find((p) => p.name === selectedPerson)
+    const isFixed = (personInfo as any)?.isFixed || false
+    const fixedRate = (personInfo as any)?.fixedRate || 0
+
+    const monthKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, "0")}`
+    const monthRecaudo = recaudos.filter((r) => r.month === monthKey).reduce((t, r) => t + r.amount, 0)
+    const totalPersonHours = completed.reduce((t, e) => t + (e.totalHours || 0), 0)
+
+    if (isFixed && fixedRate > 0) {
+      return { type: "fixed" as const, hourlyRate: fixedRate, totalHours: totalPersonHours, totalPay: Math.round(totalPersonHours * fixedRate), monthRecaudo }
+    }
+
+    if (monthRecaudo <= 0) {
+      return { type: "variable" as const, hourlyRate: 0, totalHours: totalPersonHours, totalPay: 0, monthRecaudo: 0, noRecaudo: true }
+    }
+
+    const allMonthEntries = localEntries.filter((e) => {
+      if (!e.clockIn || !e.clockOut || !e.totalHours) return false
+      const d = parseSpanishDateTime(e.clockIn)
+      return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear
+    })
+
+    let fixedCost = 0, variableHours = 0
+    for (const e of allMonthEntries) {
+      const pi = localPeople.find((p) => p.name === e.personName) as any
+      if (pi?.isFixed && pi?.fixedRate && pi.fixedRate > 0) {
+        fixedCost += (e.totalHours || 0) * pi.fixedRate
+      } else {
+        variableHours += (e.totalHours || 0)
+      }
+    }
+
+    const remaining = Math.max(0, monthRecaudo - fixedCost)
+    const variableRate = variableHours > 0 ? Math.round(remaining / variableHours) : 0
+
+    return {
+      type: "variable" as const, hourlyRate: variableRate, totalHours: totalPersonHours,
+      totalPay: Math.round(totalPersonHours * variableRate), monthRecaudo,
+      fixedCost: Math.round(fixedCost), remaining: Math.round(remaining),
+      variableHours: Math.round(variableHours * 100) / 100,
+    }
+  }, [filteredEntries, selectedPerson, localPeople, localEntries, recaudos, selectedMonth, selectedYear, isAdmin, parseSpanishDateTime])
 
   const fmtDT = (s: string) => {
     try {
@@ -265,24 +330,148 @@ export function HistoryView({ timeEntries, people, onRefresh, currentPersonName 
               )}
             </div>
           )}
-          {/* Pay breakdown */}
-          {selectedPerson !== "all" && paySummary && paySummary.totalHours > 0 && (
+          {/* Pay breakdown — admin toggle between law and custom */}
+          {selectedPerson !== "all" && paySummary && paySummary.totalHours > 0 && isAdmin && (
+            <div className="space-y-3">
+              {/* Toggle */}
+              <div className="flex rounded-xl overflow-hidden border-2 border-gray-200">
+                <button
+                  onClick={() => setPayMode("custom")}
+                  className={`flex-1 py-3 px-4 text-sm font-semibold flex items-center justify-center gap-2 transition-all ${payMode === "custom" ? "bg-emerald-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
+                >
+                  <Wallet className="h-4 w-4" />
+                  Pago Personalizado
+                </button>
+                <button
+                  onClick={() => setPayMode("law")}
+                  className={`flex-1 py-3 px-4 text-sm font-semibold flex items-center justify-center gap-2 transition-all ${payMode === "law" ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
+                >
+                  <Scale className="h-4 w-4" />
+                  Ley Colombiana
+                </button>
+              </div>
+
+              {/* Custom pay view */}
+              {payMode === "custom" && customPaySummary && (
+                <Card className="border-emerald-200 bg-emerald-50">
+                  <CardHeader className="pb-2 pt-5 px-5">
+                    <CardTitle className="text-base flex items-center gap-2 text-emerald-900">
+                      <Wallet className="h-5 w-5" />
+                      Liquidación Personalizada
+                    </CardTitle>
+                    <p className="text-sm text-emerald-700">
+                      {customPaySummary.type === "fixed" ? "Tarifa fija por hora" : "Basado en recaudo del mes"}
+                    </p>
+                  </CardHeader>
+                  <CardContent className="px-5 pb-5 space-y-3">
+                    {'noRecaudo' in customPaySummary && customPaySummary.noRecaudo ? (
+                      <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
+                        <p className="text-sm text-orange-800 font-medium">
+                          ⚠️ No hay recaudo registrado para {MONTH_NAMES[selectedMonth]} {selectedYear}.
+                        </p>
+                        <p className="text-xs text-orange-700 mt-1">
+                          Agrega un recaudo en el panel de Admin para calcular el valor hora.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-base">
+                            <span className="text-gray-700">Horas trabajadas</span>
+                            <span className="font-semibold text-gray-900">{fmtH(customPaySummary.totalHours)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-base">
+                            <span className="text-gray-700">Valor hora</span>
+                            <span className="font-semibold text-gray-900">{formatCOP(customPaySummary.hourlyRate)}</span>
+                          </div>
+                          {customPaySummary.type === "variable" && 'monthRecaudo' in customPaySummary && (
+                            <>
+                              <div className="pt-2 border-t border-emerald-200 space-y-1.5">
+                                <p className="text-xs font-medium text-emerald-800">Cálculo del mes:</p>
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-gray-600">Recaudo del mes</span>
+                                  <span className="text-gray-800">{formatCOP(customPaySummary.monthRecaudo)}</span>
+                                </div>
+                                {'fixedCost' in customPaySummary && (
+                                  <div className="flex items-center justify-between text-sm">
+                                    <span className="text-gray-600">− Costo cuidadores fijos</span>
+                                    <span className="text-red-700">−{formatCOP(customPaySummary.fixedCost as number)}</span>
+                                  </div>
+                                )}
+                                {'remaining' in customPaySummary && (
+                                  <div className="flex items-center justify-between text-sm">
+                                    <span className="text-gray-600">= Disponible para variables</span>
+                                    <span className="text-gray-800">{formatCOP(customPaySummary.remaining as number)}</span>
+                                  </div>
+                                )}
+                                {'variableHours' in customPaySummary && (
+                                  <div className="flex items-center justify-between text-sm">
+                                    <span className="text-gray-600">÷ Horas variables totales</span>
+                                    <span className="text-gray-800">{fmtH(customPaySummary.variableHours as number)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        <div className="pt-3 border-t border-emerald-200">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-lg text-emerald-900">Total a pagar</span>
+                            <span className="font-bold text-xl text-emerald-700">{formatCOP(customPaySummary.totalPay)}</span>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Law-based pay view */}
+              {payMode === "law" && (
+                <Card className="border-blue-200 bg-blue-50">
+                  <CardHeader className="pb-2 pt-5 px-5">
+                    <CardTitle className="text-base flex items-center gap-2 text-blue-900">
+                      <Scale className="h-5 w-5" />
+                      Liquidación según Ley Laboral Colombiana
+                    </CardTitle>
+                    <p className="text-sm text-blue-700">SMLMV 2026: {formatCOP(paySummary.monthlyMinWage)} · Valor hora: {formatCOP(Math.round(paySummary.hourlyRate))}</p>
+                  </CardHeader>
+                  <CardContent className="px-5 pb-5 space-y-3">
+                    <div className="space-y-3">
+                      {paySummary.hourBreakdown.regularDay > 0 && <div className="flex items-center justify-between text-base"><div className="flex items-center gap-2"><Sun className="h-5 w-5 text-yellow-600" /><span className="text-gray-800">Diurnas ordinarias</span><span className="text-sm text-gray-600">({fmtH(paySummary.hourBreakdown.regularDay)})</span></div><span className="font-semibold text-gray-900">{formatCOP(paySummary.regularDayPay)}</span></div>}
+                      {paySummary.hourBreakdown.regularNight > 0 && <div className="flex items-center justify-between text-base"><div className="flex items-center gap-2"><Moon className="h-5 w-5 text-indigo-600" /><span className="text-gray-800">Nocturnas +35%</span><span className="text-sm text-gray-600">({fmtH(paySummary.hourBreakdown.regularNight)})</span></div><span className="font-semibold text-gray-900">{formatCOP(paySummary.regularNightPay)}</span></div>}
+                      {paySummary.hourBreakdown.sundayHolidayDay > 0 && <div className="flex items-center justify-between text-base"><div className="flex items-center gap-2"><PartyPopper className="h-5 w-5 text-orange-600" /><span className="text-gray-800">Dom/Festivo diurno</span><span className="text-sm text-gray-600">({fmtH(paySummary.hourBreakdown.sundayHolidayDay)})</span></div><span className="font-semibold text-gray-900">{formatCOP(paySummary.sundayHolidayDayPay)}</span></div>}
+                      {paySummary.hourBreakdown.sundayHolidayNight > 0 && <div className="flex items-center justify-between text-base"><div className="flex items-center gap-2"><Moon className="h-5 w-5 text-purple-600" /><span className="text-gray-800">Dom/Festivo nocturno</span><span className="text-sm text-gray-600">({fmtH(paySummary.hourBreakdown.sundayHolidayNight)})</span></div><span className="font-semibold text-gray-900">{formatCOP(paySummary.sundayHolidayNightPay)}</span></div>}
+                    </div>
+                    <div className="pt-3 border-t border-blue-200">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-lg text-blue-900">Total a pagar</span>
+                        <span className="font-bold text-xl text-blue-700">{formatCOP(paySummary.totalPay)}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-blue-700 leading-relaxed">* Cálculo basado en salario mínimo 2026 y Ley 2466/2025.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {/* Non-admin: hours breakdown only */}
+          {selectedPerson !== "all" && paySummary && paySummary.totalHours > 0 && !isAdmin && (
             <Card className="border-emerald-200 bg-emerald-50">
               <CardHeader className="pb-2 pt-5 px-5">
                 <CardTitle className="text-base flex items-center gap-2 text-emerald-900">
-                  {isAdmin ? <DollarSign className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
-                  {isAdmin ? "Liquidación según Ley Laboral Colombiana" : "Desglose de Horas por Tipo"}
+                  <Clock className="h-5 w-5" />
+                  Desglose de Horas por Tipo
                 </CardTitle>
-                {isAdmin && <p className="text-sm text-emerald-700">SMLMV 2026: {formatCOP(paySummary.monthlyMinWage)} · Valor hora: {formatCOP(Math.round(paySummary.hourlyRate))}</p>}
               </CardHeader>
               <CardContent className="px-5 pb-5 space-y-3">
                 <div className="space-y-3">
-                  {paySummary.hourBreakdown.regularDay > 0 && <div className="flex items-center justify-between text-base"><div className="flex items-center gap-2"><Sun className="h-5 w-5 text-yellow-600" /><span className="text-gray-800">Diurnas ordinarias</span><span className="text-sm text-gray-600">({fmtH(paySummary.hourBreakdown.regularDay)})</span></div>{isAdmin && <span className="font-semibold text-gray-900">{formatCOP(paySummary.regularDayPay)}</span>}</div>}
-                  {paySummary.hourBreakdown.regularNight > 0 && <div className="flex items-center justify-between text-base"><div className="flex items-center gap-2"><Moon className="h-5 w-5 text-indigo-600" /><span className="text-gray-800">Nocturnas +35%</span><span className="text-sm text-gray-600">({fmtH(paySummary.hourBreakdown.regularNight)})</span></div>{isAdmin && <span className="font-semibold text-gray-900">{formatCOP(paySummary.regularNightPay)}</span>}</div>}
-                  {paySummary.hourBreakdown.sundayHolidayDay > 0 && <div className="flex items-center justify-between text-base"><div className="flex items-center gap-2"><PartyPopper className="h-5 w-5 text-orange-600" /><span className="text-gray-800">Dom/Festivo diurno</span><span className="text-sm text-gray-600">({fmtH(paySummary.hourBreakdown.sundayHolidayDay)})</span></div>{isAdmin && <span className="font-semibold text-gray-900">{formatCOP(paySummary.sundayHolidayDayPay)}</span>}</div>}
-                  {paySummary.hourBreakdown.sundayHolidayNight > 0 && <div className="flex items-center justify-between text-base"><div className="flex items-center gap-2"><Moon className="h-5 w-5 text-purple-600" /><span className="text-gray-800">Dom/Festivo nocturno</span><span className="text-sm text-gray-600">({fmtH(paySummary.hourBreakdown.sundayHolidayNight)})</span></div>{isAdmin && <span className="font-semibold text-gray-900">{formatCOP(paySummary.sundayHolidayNightPay)}</span>}</div>}
+                  {paySummary.hourBreakdown.regularDay > 0 && <div className="flex items-center justify-between text-base"><div className="flex items-center gap-2"><Sun className="h-5 w-5 text-yellow-600" /><span className="text-gray-800">Diurnas ordinarias</span></div><span className="font-semibold text-gray-900">{fmtH(paySummary.hourBreakdown.regularDay)}</span></div>}
+                  {paySummary.hourBreakdown.regularNight > 0 && <div className="flex items-center justify-between text-base"><div className="flex items-center gap-2"><Moon className="h-5 w-5 text-indigo-600" /><span className="text-gray-800">Nocturnas</span></div><span className="font-semibold text-gray-900">{fmtH(paySummary.hourBreakdown.regularNight)}</span></div>}
+                  {paySummary.hourBreakdown.sundayHolidayDay > 0 && <div className="flex items-center justify-between text-base"><div className="flex items-center gap-2"><PartyPopper className="h-5 w-5 text-orange-600" /><span className="text-gray-800">Dom/Festivo diurno</span></div><span className="font-semibold text-gray-900">{fmtH(paySummary.hourBreakdown.sundayHolidayDay)}</span></div>}
+                  {paySummary.hourBreakdown.sundayHolidayNight > 0 && <div className="flex items-center justify-between text-base"><div className="flex items-center gap-2"><Moon className="h-5 w-5 text-purple-600" /><span className="text-gray-800">Dom/Festivo nocturno</span></div><span className="font-semibold text-gray-900">{fmtH(paySummary.hourBreakdown.sundayHolidayNight)}</span></div>}
                 </div>
-                {isAdmin && (<><div className="pt-3 border-t border-emerald-200"><div className="flex items-center justify-between"><span className="font-bold text-lg text-emerald-900">Total a pagar</span><span className="font-bold text-xl text-emerald-700">{formatCOP(paySummary.totalPay)}</span></div></div><p className="text-xs text-emerald-700 leading-relaxed">* Cálculo basado en salario mínimo 2026 y Ley 2466/2025.</p></>)}
               </CardContent>
             </Card>
           )}
@@ -347,8 +536,16 @@ export function HistoryView({ timeEntries, people, onRefresh, currentPersonName 
                       <div className="pt-3 border-t border-gray-200">
                         <div className="flex items-center justify-between">
                           <span className="text-base text-gray-700">Tiempo total:</span>
-                          <span className="font-bold text-lg text-blue-600">{fmtH(entry.totalHours)}</span>
+                          <span className={`font-bold text-lg ${entry.totalHours > 16 ? "text-red-600" : "text-blue-600"}`}>{fmtH(entry.totalHours)}</span>
                         </div>
+                        {entry.totalHours > 16 && (
+                          <div className="flex items-center gap-2 mt-2 p-2 bg-red-50 rounded-lg border border-red-200">
+                            <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
+                            <span className="text-sm text-red-800 font-medium">
+                              ⚠️ Registro anormal — más de 16 horas. Verificar si olvidó marcar salida.
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
 
