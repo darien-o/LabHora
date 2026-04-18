@@ -28,7 +28,7 @@ try {
             if ($r[2] === $personName) {
                 json_error("$personName ya está fichado.", 400);
             } else {
-                json_error($r[2] . ' ya está fichado. Debe fichar salida primero.', 400);
+                json_error($r[2] . ' ya está fichado. Debe registrar salida primero.', 400);
             }
         }
     }

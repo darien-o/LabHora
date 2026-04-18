@@ -1,6 +1,6 @@
 # Control de Horarios — Cuidadores
 
-Aplicación web para registrar las horas de trabajo de cuidadores. Permite fichar entrada y salida, consultar el historial de registros y agregar entradas históricas. Todos los datos se almacenan en una hoja de cálculo de Google Sheets.
+Aplicación web para registrar las horas de trabajo de cuidadores. Permite registrar entrada y salida, consultar el historial de registros y agregar entradas históricas. Todos los datos se almacenan en una hoja de cálculo de Google Sheets.
 
 ## Requisitos previos
 
@@ -114,8 +114,8 @@ public_html/
 ## Uso
 
 1. Selecciona un cuidador de la lista
-2. Presiona **Entrada** para fichar la hora de llegada
-3. Presiona **Salida** para fichar la hora de salida (si el turno supera 8 horas, se pedirá confirmación)
+2. Presiona **Entrada** para registrar la hora de llegada
+3. Presiona **Salida** para registrar la hora de salida (si el turno supera 8 horas, se pedirá confirmación)
 4. Si otro cuidador ya está fichado, puedes agregar un registro histórico con fechas y horas personalizadas
 5. Consulta el historial en la pestaña **Historial**, con filtro por cuidador y totales de horas
 6. En la pestaña **Turnos**, asigna bloques de 2 horas (6AM–10PM) a cada cuidador para la semana. Navega entre semanas y visualiza la cobertura

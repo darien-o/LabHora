@@ -56,7 +56,7 @@ export async function postClockIn(personName: string, timestamp: string) {
     body: JSON.stringify({ personName, timestamp }),
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "Error al fichar entrada")
+  if (!res.ok) throw new Error(data.error || "Error al registrar entrada")
   return data
 }
 
@@ -67,7 +67,7 @@ export async function postClockOut(personName: string, timestamp: string) {
     body: JSON.stringify({ personName, timestamp }),
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.error || "Error al fichar salida")
+  if (!res.ok) throw new Error(data.error || "Error al registrar salida")
   return data
 }
 

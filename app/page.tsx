@@ -221,7 +221,7 @@ function ClockTrackerInner() {
       await refreshData();
       showAlertMessage(`¡Entrada registrada! Bienvenido/a ${selectedPerson.name}.`);
     } catch (error: any) {
-      showAlertMessage(error.message || "Error al fichar entrada.");
+      showAlertMessage(error.message || "Error al registrar entrada.");
     } finally { setLoading(false); }
   };
 
@@ -241,7 +241,7 @@ function ClockTrackerInner() {
       // Show post-clockout dialog for optional photos/comments
       setShowPostClockOut(true);
     } catch (error: any) {
-      showAlertMessage(error.message || "Error al fichar salida.");
+      showAlertMessage(error.message || "Error al registrar salida.");
     } finally { setLoading(false); }
   };
 
@@ -329,8 +329,8 @@ function ClockTrackerInner() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className={`grid w-full h-auto ${isAdmin ? "grid-cols-4" : "grid-cols-3"}`}>
-            <TabsTrigger value="clock" className="flex items-center gap-1.5 text-sm py-3"><Timer className="h-5 w-5" />Fichar</TabsTrigger>
-            <TabsTrigger value="schedule" className="flex items-center gap-1.5 text-sm py-3"><CalendarDays className="h-5 w-5" />Turnos</TabsTrigger>
+            <TabsTrigger value="clock" className="flex items-center gap-1.5 text-sm py-3"><Timer className="h-5 w-5" />registrar</TabsTrigger>
+            <TabsTrigger value="schedule" className="flex items-center gap-1.5 text-sm py-3"><CalendarDays className="h-5 w-5" />Programar</TabsTrigger>
             <TabsTrigger value="history" className="flex items-center gap-1.5 text-sm py-3"><History className="h-5 w-5" />Historial</TabsTrigger>
             {isAdmin && (
               <TabsTrigger value="admin" className="flex items-center gap-1.5 text-sm py-3 relative">

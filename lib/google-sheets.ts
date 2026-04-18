@@ -199,7 +199,7 @@ export async function clockIn(personName: string, timestamp: string): Promise<vo
     // Check that no other person is active
     const activePerson = await getActivePerson()
     if (activePerson && activePerson.name !== personName) {
-      throw new Error(`${activePerson.name} ya está fichado. Debe fichar salida primero.`)
+      throw new Error(`${activePerson.name} ya está fichado. Debe registrar salida primero.`)
     }
 
     // Check that this person is not already clocked in
