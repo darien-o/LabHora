@@ -190,3 +190,179 @@ export async function postRecaudo(data: {
   if (!res.ok) throw new Error(result.error || "Error en recaudos")
   return result
 }
+
+// --- Anticipos (advances) ---
+
+export async function fetchAdvances(month?: string) {
+  const base = url("anticipos")
+  const params = new URLSearchParams()
+  if (month) params.set("month", month)
+  params.set("_t", String(Date.now()))
+  const sep = base.includes("?") ? "&" : "?"
+  const res = await fetch(`${base}${sep}${params.toString()}`, {
+    cache: "no-store",
+    headers: NO_CACHE_HEADERS,
+  })
+  return res.json()
+}
+
+export async function postAdvance(data: {
+  action: "add" | "edit" | "delete"
+  personName?: string
+  amount?: number
+  date?: string
+  month?: string
+  description?: string
+  rowIndex?: number
+}) {
+  const res = await fetch(url("anticipos"), {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(data),
+  })
+  const result = await res.json()
+  if (!res.ok) throw new Error(result.error || "Error en anticipos")
+  return result
+}
+
+// --- Gastos (expenses / income) ---
+
+export async function fetchExpenses(entryRowIndex?: number) {
+  const base = url("gastos")
+  const params = new URLSearchParams()
+  if (entryRowIndex !== undefined) params.set("entryRowIndex", String(entryRowIndex))
+  params.set("_t", String(Date.now()))
+  const sep = base.includes("?") ? "&" : "?"
+  const res = await fetch(`${base}${sep}${params.toString()}`, {
+    cache: "no-store",
+    headers: NO_CACHE_HEADERS,
+  })
+  return res.json()
+}
+
+export async function postExpense(data: {
+  action: "add" | "delete"
+  personName?: string
+  type?: "expense" | "income"
+  amount?: number
+  description?: string
+  entryRowIndex?: number
+  rowIndex?: number
+}) {
+  const res = await fetch(url("gastos"), {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(data),
+  })
+  const result = await res.json()
+  if (!res.ok) throw new Error(result.error || "Error en gastos")
+  return result
+}
+
+// --- Recibos (payment receipts — multipart) ---
+
+export async function fetchReceipts(month?: string) {
+  const base = url("recibos")
+  const params = new URLSearchParams()
+  if (month) params.set("month", month)
+  params.set("_t", String(Date.now()))
+  const sep = base.includes("?") ? "&" : "?"
+  const res = await fetch(`${base}${sep}${params.toString()}`, {
+    cache: "no-store",
+    headers: NO_CACHE_HEADERS,
+  })
+  return res.json()
+}
+
+export async function postReceipt(formData: FormData) {
+  const res = await fetch(url("recibos"), {
+    method: "POST",
+    body: formData,
+  })
+  const result = await res.json()
+  if (!res.ok) throw new Error(result.error || "Error al crear recibo")
+  return result
+}
+
+// --- Bloqueos (schedule blocks) ---
+
+export async function fetchBlocks(weekStart?: string) {
+  const base = url("bloqueos")
+  const params = new URLSearchParams()
+  if (weekStart) params.set("weekStart", weekStart)
+  params.set("_t", String(Date.now()))
+  const sep = base.includes("?") ? "&" : "?"
+  const res = await fetch(`${base}${sep}${params.toString()}`, {
+    cache: "no-store",
+    headers: NO_CACHE_HEADERS,
+  })
+  return res.json()
+}
+
+export async function postBlock(data: {
+  action: "add" | "remove"
+  personName?: string
+  startDate?: string
+  endDate?: string
+  startTime?: string
+  endTime?: string
+  repeat?: "weekly" | ""
+  repeatEndDate?: string
+  reason?: string
+  rowIndex?: number
+}) {
+  const res = await fetch(url("bloqueos"), {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(data),
+  })
+  const result = await res.json()
+  if (!res.ok) throw new Error(result.error || "Error en bloqueos")
+  return result
+}
+
+// --- Payment confirmation (caregiver confirms payment received) ---
+
+export async function postPaymentConfirmation(entryRowIndex: number, amountReceived?: number) {
+  const res = await fetch(url("confirm-payment"), {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ entryRowIndex, amountReceived }),
+  })
+  const result = await res.json()
+  if (!res.ok) throw new Error(result.error || "Error al confirmar pago")
+  return result
+}
+
+// --- Bulk toggle paid (mass payment marking) ---
+
+export async function postBulkTogglePaid(rowIndices: number[], paid: boolean) {
+  const res = await fetch(url("toggle-paid"), {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ action: "bulk-toggle", rowIndices, paid }),
+  })
+  const result = await res.json()
+  if (!res.ok) throw new Error(result.error || "Error al marcar pagos masivamente")
+  return result
+}
+
+// --- Schedule repeat (recurring shifts) ---
+
+export async function postScheduleRepeat(data: {
+  personName: string
+  date: string
+  startTime: string
+  endTime: string
+  frequency: "daily" | "weekly"
+  endDate: string
+}) {
+  const res = await fetch(url("schedule"), {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ action: "add-repeat", ...data }),
+  })
+  const result = await res.json()
+  if (!res.ok) throw new Error(result.error || "Error al crear turno repetitivo")
+  return result
+}

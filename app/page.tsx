@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -22,11 +22,13 @@ import { AdminRecaudos } from "@/components/admin-recaudos";
 import { ProfileSelector } from "@/components/profile-selector";
 import { AdminProvider, useAdmin } from "@/lib/admin-context";
 import { MarujitaIcon } from "@/components/marujita-icon";
+import { ActiveShiftExpenses } from "@/components/active-shift-expenses";
+import { UpcomingShiftAlert } from "@/components/upcoming-shift-alert";
 import {
   AlertDialog, AlertDialogAction, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { fetchPeople, fetchTimeEntries, postClockIn, postClockOut, postHistoricalEntry } from "@/lib/api-client";
+import { fetchPeople, fetchTimeEntries, postClockIn, postClockOut, postHistoricalEntry, fetchSchedule } from "@/lib/api-client";
 
 interface Person {
   id: string; name: string; avatar?: string; isActive: boolean;
@@ -35,7 +37,8 @@ interface Person {
 interface TimeEntry {
   id: string; rowIndex: number; personName: string; clockIn: string;
   clockOut?: string; totalHours?: number; paid: boolean; date: string;
-  hourlyValue?: number;
+  hourlyValue?: number; notes?: string; images?: string;
+  confirmedByCaregiver?: string; confirmationDate?: string; amountConfirmed?: number;
 }
 
 const PROFILE_KEY = "marujita_profile";
@@ -65,6 +68,7 @@ function ClockTrackerInner() {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [profileName, setProfileName] = useState<string | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
+  const [todayShifts, setTodayShifts] = useState<Array<{ date: string; personName: string; startTime: string; endTime: string }>>([]);
 
   const unresolvedAlerts = alerts.filter((a) => !a.resolved).length;
 
@@ -151,7 +155,7 @@ function ClockTrackerInner() {
 
   const loadInitialData = async () => {
     setInitialLoading(true);
-    try { await Promise.all([loadPeople(), loadTimeEntries()]); }
+    try { await Promise.all([loadPeople(), loadTimeEntries(), loadTodayShifts()]); }
     catch { showAlertMessage("Error al cargar los datos. Verifica la conexión."); }
     finally { setInitialLoading(false); }
   };
@@ -175,6 +179,21 @@ function ClockTrackerInner() {
       const data = await fetchTimeEntries();
       if (data.error) throw new Error(data.error);
       setTimeEntries(data);
+    } catch {}
+  };
+
+  const loadTodayShifts = async () => {
+    try {
+      const today = new Date();
+      const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ...
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const monday = new Date(today);
+      monday.setDate(today.getDate() + mondayOffset);
+      const weekStart = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
+      const data = await fetchSchedule(weekStart);
+      if (!data.error && Array.isArray(data)) {
+        setTodayShifts(data);
+      }
     } catch {}
   };
 
@@ -225,6 +244,29 @@ function ClockTrackerInner() {
     } finally { setLoading(false); }
   };
 
+  const handleConfirmShift = async (date: string, startTime: string) => {
+    if (!selectedPerson) return;
+    const active = getActivePerson();
+    if (active) {
+      showAlertMessage(active.name === selectedPerson.name
+        ? "Ya estás fichado."
+        : `${active.name} está fichado actualmente. No se puede registrar entrada automática.`);
+      return;
+    }
+    setLoading(true);
+    try {
+      // Build the shift start time as the clock-in timestamp
+      const [y, mo, d] = date.split("-").map(Number);
+      const [h, m] = startTime.split(":").map(Number);
+      const shiftStart = new Date(y, mo - 1, d, h, m, 0, 0);
+      await postClockIn(selectedPerson.name, shiftStart.toISOString());
+      await refreshData();
+      showAlertMessage(`¡Turno confirmado! Entrada registrada para ${selectedPerson.name}.`);
+    } catch (error: any) {
+      showAlertMessage(error.message || "Error al confirmar turno.");
+    } finally { setLoading(false); }
+  };
+
   const handleClockOut = async () => {
     if (!selectedPerson?.isActive || !selectedPerson?.lastClockIn) return;
     const hours = getActiveHours();
@@ -264,6 +306,15 @@ function ClockTrackerInner() {
   const activePerson = getActivePerson();
   const isMyProfile = selectedPerson?.name === profileName;
   const iAmActive = selectedPerson?.isActive && isMyProfile;
+
+  // Find the active time entry's rowIndex for expenses
+  const activeEntryRowIndex = useMemo(() => {
+    if (!selectedPerson?.isActive) return undefined;
+    const activeEntry = timeEntries.find(
+      (e) => e.personName === selectedPerson.name && !e.clockOut
+    );
+    return activeEntry?.rowIndex;
+  }, [selectedPerson, timeEntries]);
 
   if (initialLoading || !profileLoaded) {
     return (
@@ -341,6 +392,15 @@ function ClockTrackerInner() {
           </TabsList>
 
           <TabsContent value="clock" className="space-y-6">
+            {/* Upcoming shift alert */}
+            {profileName && todayShifts.length > 0 && (
+              <UpcomingShiftAlert
+                shifts={todayShifts}
+                personName={profileName}
+                onConfirmShift={handleConfirmShift}
+              />
+            )}
+
             {/* Active status banner */}
             {activePerson && (
               <Card className="border-green-200 bg-green-50 shadow-md">
@@ -367,6 +427,7 @@ function ClockTrackerInner() {
             {!isAdmin && selectedPerson && (
               <div className="space-y-4">
                 {iAmActive ? (
+                  <>
                   <Button
                     onClick={handleClockOut}
                     disabled={loading}
@@ -375,6 +436,13 @@ function ClockTrackerInner() {
                     <AlertCircle className="h-8 w-8 mr-3" />
                     Marcar Salida
                   </Button>
+                  {activeEntryRowIndex !== undefined && selectedPerson && (
+                    <ActiveShiftExpenses
+                      personName={selectedPerson.name}
+                      entryRowIndex={activeEntryRowIndex}
+                    />
+                  )}
+                  </>
                 ) : activePerson && activePerson.name !== selectedPerson.name ? (
                   <div className="space-y-3">
                     <Card className="border-orange-200 bg-orange-50">
@@ -386,9 +454,10 @@ function ClockTrackerInner() {
                       </CardContent>
                     </Card>
                     <Button
+                      variant="action"
                       onClick={handleClockIn}
                       disabled={loading}
-                      className="w-full h-24 text-2xl font-bold rounded-2xl bg-blue-600 hover:bg-blue-700 shadow-lg"
+                      className="w-full max-w-none h-24 text-2xl font-bold shadow-lg"
                     >
                       <Calendar className="h-8 w-8 mr-3" />
                       Crear Registro Histórico
@@ -477,7 +546,7 @@ function ClockTrackerInner() {
 
           <TabsContent value="history">
             <div className="mb-4">
-              <Button onClick={() => setShowBatchHistorical(true)} className="w-full bg-blue-600 hover:bg-blue-700 h-14 text-base font-semibold rounded-xl">
+              <Button variant="action" onClick={() => setShowBatchHistorical(true)} className="w-full max-w-none h-14 text-base font-semibold">
                 <Calendar className="h-5 w-5 mr-2" />Agregar Días Pasados por Lote
               </Button>
             </div>
@@ -508,7 +577,7 @@ function ClockTrackerInner() {
 
       <ConfirmClockOutDialog open={showConfirmClockOut} onOpenChange={setShowConfirmClockOut} person={selectedPerson} onConfirm={performClockOut} />
       <HistoricalEntryDialog open={showHistoricalEntry} onOpenChange={setShowHistoricalEntry} person={selectedPerson} onConfirm={handleHistoricalEntry} timeEntries={timeEntries} />
-      <BatchHistoricalDialog open={showBatchHistorical} onOpenChange={setShowBatchHistorical} people={people} timeEntries={timeEntries} onSubmitEntry={handleBatchEntry} onComplete={refreshData} />
+      <BatchHistoricalDialog open={showBatchHistorical} onOpenChange={setShowBatchHistorical} people={people} timeEntries={timeEntries} currentPersonName={profileName || undefined} onSubmitEntry={handleBatchEntry} onComplete={refreshData} />
       <PostClockOutDialog open={showPostClockOut} onOpenChange={setShowPostClockOut} personName={profileName || ""} onDone={() => showAlertMessage("¡Salida registrada correctamente!")} />
       <AlertDialog open={showAlert} onOpenChange={setShowAlert}>
         <AlertDialogContent><AlertDialogHeader>

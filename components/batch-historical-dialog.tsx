@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,13 +15,6 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Calendar,
   AlertTriangle,
   Plus,
@@ -32,10 +25,12 @@ import {
   XCircle,
   Loader2,
   Pencil,
+  Check,
 } from "lucide-react";
 import { ConflictDialog } from "@/components/conflict-dialog";
 import { detectConflicts, type ConflictResult } from "@/lib/conflict-detector";
 import { useAdmin } from "@/lib/admin-context";
+import { getNextCalendarDay } from "@/lib/schedule-utils";
 
 interface Person {
   id: string;
@@ -65,6 +60,7 @@ interface BatchHistoricalDialogProps {
   onOpenChange: (open: boolean) => void;
   people: Person[];
   timeEntries: TimeEntry[];
+  currentPersonName?: string;
   onSubmitEntry: (
     personName: string,
     clockIn: string,
@@ -80,6 +76,7 @@ export function BatchHistoricalDialog({
   onOpenChange,
   people,
   timeEntries,
+  currentPersonName,
   onSubmitEntry,
   onComplete,
 }: BatchHistoricalDialogProps) {
@@ -96,6 +93,14 @@ export function BatchHistoricalDialog({
 
   // Conflict dialog state
   const [showConflictDialog, setShowConflictDialog] = useState(false);
+
+  // Preselect caregiver matching the active session profile
+  useEffect(() => {
+    if (open && currentPersonName && !selectedPerson) {
+      const match = people.find((p) => p.name === currentPersonName);
+      if (match) setSelectedPerson(match.name);
+    }
+  }, [open, currentPersonName, people, selectedPerson]);
   const [pendingConflicts, setPendingConflicts] = useState<ConflictResult[]>([]);
   const [pendingEntryData, setPendingEntryData] = useState<{
     date: string;
@@ -267,13 +272,8 @@ export function BatchHistoricalDialog({
       );
     }
 
-    // Advance date to next weekday
-    const nextDate = new Date(date + "T12:00:00");
-    nextDate.setDate(nextDate.getDate() + 1);
-    while (nextDate.getDay() === 0 || nextDate.getDay() === 6) {
-      nextDate.setDate(nextDate.getDate() + 1);
-    }
-    const nextDateStr = nextDate.toISOString().split("T")[0];
+    // Advance date to next calendar day (including weekends)
+    const nextDateStr = getNextCalendarDay(date);
     if (nextDateStr <= today) {
       setCurrentDate(nextDateStr);
     }
@@ -426,25 +426,46 @@ export function BatchHistoricalDialog({
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Person selector */}
+            {/* Person selector — avatar grid */}
             <div>
               <Label className="text-sm font-medium">Cuidador</Label>
-              <Select
-                value={selectedPerson}
-                onValueChange={setSelectedPerson}
-                disabled={isSubmitting}
-              >
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Seleccionar cuidador" />
-                </SelectTrigger>
-                <SelectContent>
-                  {people.map((p) => (
-                    <SelectItem key={p.id} value={p.name}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                {people.map((p) => {
+                  const isSelected = selectedPerson === p.name;
+                  const initial = p.name.charAt(0).toUpperCase();
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => setSelectedPerson(p.name)}
+                      className={`relative flex flex-col items-center gap-1 p-2 rounded-lg border-2 transition-all ${
+                        isSelected
+                          ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200"
+                          : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                      } ${isSubmitting ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                    >
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold ${
+                          isSelected
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-200 text-gray-600"
+                        }`}
+                      >
+                        {initial}
+                      </div>
+                      <span className="text-xs font-medium text-center leading-tight truncate w-full">
+                        {p.name}
+                      </span>
+                      {isSelected && (
+                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                          <Check className="h-3 w-3 text-white" />
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Entry form */}

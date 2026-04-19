@@ -1,14 +1,15 @@
 <?php
 /**
  * GET — Devuelve todos los registros de tiempo.
- * Sheet "Registro": A=ClockIn, B=ClockOut, C=Nombre, D=Horas, E=Pagado, F=Valor Hora
+ * Sheet "Registro": A=ClockIn, B=ClockOut, C=Nombre, D=Horas, E=Pagado, F=Valor Hora,
+ *                   G=Notas, H=Imágenes, I=Confirmado Cuidador, J=Fecha Confirmación, K=Monto Confirmado
  */
 require_once __DIR__ . '/sheets.php';
 cors_headers();
 
 try {
     $service = get_sheets_service();
-    $resp = $service->spreadsheets_values->get(GOOGLE_SHEET_ID, SHEET_REGISTRO . '!A:F');
+    $resp = $service->spreadsheets_values->get(GOOGLE_SHEET_ID, SHEET_REGISTRO . '!A:K');
     $rows = $resp->getValues() ?? [];
 
     $entries = [];
@@ -24,6 +25,14 @@ try {
         $paidRaw = strtolower(trim($row[4] ?? ''));
         $paid = ($paidRaw === 'sí' || $paidRaw === 'si');
         $hourlyValue = !empty($row[5]) ? (float)preg_replace('/[^0-9.]/', '', str_replace(',', '', $row[5])) : null;
+
+        // New columns G–K
+        $notes = isset($row[6]) && $row[6] !== '' ? $row[6] : '';
+        $images = isset($row[7]) && $row[7] !== '' ? $row[7] : '';
+        $confirmedRaw = strtolower(trim($row[8] ?? ''));
+        $confirmedByCaregiver = ($confirmedRaw === 'sí' || $confirmedRaw === 'si');
+        $confirmationDate = isset($row[9]) && $row[9] !== '' ? $row[9] : null;
+        $amountConfirmed = isset($row[10]) && $row[10] !== '' ? (float)preg_replace('/[^0-9.]/', '', str_replace(',', '', $row[10])) : null;
 
         $dateISO = '';
         try {
@@ -41,6 +50,11 @@ try {
             'paid' => $paid,
             'hourlyValue' => $hourlyValue,
             'date' => $dateISO,
+            'notes' => $notes,
+            'images' => $images,
+            'confirmedByCaregiver' => $confirmedByCaregiver,
+            'confirmationDate' => $confirmationDate,
+            'amountConfirmed' => $amountConfirmed,
         ];
     }
 

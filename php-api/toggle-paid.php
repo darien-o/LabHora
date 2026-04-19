@@ -1,7 +1,12 @@
 <?php
 /**
  * POST — Cambia el estado de pago de un registro y calcula el valor hora.
- * Body: { rowIndex: int, paid: bool }
+ *
+ * Single toggle:
+ *   Body: { rowIndex: int, paid: bool }
+ *
+ * Bulk toggle:
+ *   Body: { action: "bulk-toggle", rowIndices: int[], paid: bool, receiptRowIndex?: int }
  *
  * Sheet "Cuidadores": A=Nombre, B=Pago Fijo (Sí/No), C=Tarifa (COP)
  * Sheet "Registro":   A=ClockIn, B=ClockOut, C=Nombre, D=Horas, E=Pagado, F=Valor Hora
@@ -21,6 +26,79 @@ if (!defined('SHEET_RECAUDOS')) {
 
 try {
     $data = get_json_body();
+    $action = $data['action'] ?? '';
+
+    // =============================================
+    // BULK TOGGLE — mark multiple rows at once
+    // =============================================
+    if ($action === 'bulk-toggle') {
+        $rowIndices = $data['rowIndices'] ?? [];
+        $paid = $data['paid'] ?? false;
+        $receiptRowIndex = $data['receiptRowIndex'] ?? null;
+
+        // Validate rowIndices is a non-empty array of positive integers
+        if (!is_array($rowIndices) || empty($rowIndices)) {
+            json_error('rowIndices debe ser un array no vacío', 400);
+        }
+
+        foreach ($rowIndices as $idx) {
+            if (!is_int($idx) || $idx < 2) {
+                json_error('Cada rowIndex debe ser un entero >= 2', 400);
+            }
+        }
+
+        $service = get_sheets_service();
+        $sheetId = GOOGLE_SHEET_ID;
+        $paidValue = $paid ? 'Sí' : 'No';
+
+        // Build batch update data — one ValueRange per row
+        $batchData = [];
+        foreach ($rowIndices as $idx) {
+            $vr = new Google\Service\Sheets\ValueRange();
+            $vr->setRange(SHEET_REGISTRO . "!E$idx");
+            $vr->setValues([[$paidValue]]);
+            $batchData[] = $vr;
+        }
+
+        $batchBody = new Google\Service\Sheets\BatchUpdateValuesRequest();
+        $batchBody->setValueInputOption('USER_ENTERED');
+        $batchBody->setData($batchData);
+
+        $service->spreadsheets_values->batchUpdate($sheetId, $batchBody);
+
+        // Optionally associate a receipt with this bulk operation
+        $receiptInfo = null;
+        if ($receiptRowIndex !== null && is_int($receiptRowIndex) && $receiptRowIndex >= 2) {
+            // Read the receipt row to return its info
+            $recResp = $service->spreadsheets_values->get($sheetId, SHEET_RECIBOS . "!A{$receiptRowIndex}:G{$receiptRowIndex}");
+            $recRows = $recResp->getValues() ?? [];
+            if (!empty($recRows[0])) {
+                $r = $recRows[0];
+                $receiptInfo = [
+                    'rowIndex'    => $receiptRowIndex,
+                    'month'       => trim($r[0] ?? ''),
+                    'personName'  => trim($r[1] ?? ''),
+                    'notes'       => trim($r[2] ?? ''),
+                    'description' => trim($r[3] ?? ''),
+                    'imageFileId' => trim($r[4] ?? ''),
+                    'imageUrl'    => trim($r[5] ?? ''),
+                    'createdAt'   => trim($r[6] ?? ''),
+                ];
+            }
+        }
+
+        json_response([
+            'success' => true,
+            'message' => "Marcados $paidValue: " . count($rowIndices) . " registros",
+            'updatedCount' => count($rowIndices),
+            'receipt' => $receiptInfo,
+        ]);
+        return;
+    }
+
+    // =============================================
+    // SINGLE TOGGLE — original behavior
+    // =============================================
     $rowIndex = $data['rowIndex'] ?? 0;
     $paid = $data['paid'] ?? false;
 

@@ -4,8 +4,6 @@ import { useState, useEffect, useMemo, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle,
@@ -17,8 +15,15 @@ import {
 import {
   ChevronLeft, ChevronRight, CalendarDays, RefreshCw,
   Plus, AlertTriangle, Clock, Trash2, UserCheck, Check, Eye,
+  Ban, ShieldAlert, Repeat, CalendarRange,
 } from "lucide-react"
-import { fetchSchedule, postScheduleShift } from "@/lib/api-client"
+import { fetchSchedule, postScheduleShift, fetchBlocks, postScheduleRepeat, postHistoricalEntry } from "@/lib/api-client"
+import { getWeekStartMonday, checkBlockConflicts, type ScheduleBlock } from "@/lib/schedule-utils"
+import { ShiftDayPicker } from "@/components/shift-day-picker"
+import { RepeatShiftConfig } from "@/components/repeat-shift-config"
+import { BlockScheduleDialog } from "@/components/block-schedule-dialog"
+import { MultiDayRegistration } from "@/components/multi-day-registration"
+import { useAdmin } from "@/lib/admin-context"
 
 interface Person { id: string; name: string }
 interface Shift {
@@ -30,13 +35,8 @@ interface ScheduleViewProps {
   currentPersonName?: string
 }
 
-const DAY_NAMES_FULL = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
-
-const QUICK_SLOTS = [
-  { label: "Mañana", sub: "6:00 AM – 12:00 PM", start: "06:00", end: "12:00" },
-  { label: "Tarde", sub: "12:00 PM – 6:00 PM", start: "12:00", end: "18:00" },
-  { label: "Noche", sub: "6:00 PM – 10:00 PM", start: "18:00", end: "22:00" },
-]
+// Task 9.1: Week starts on Monday — order is Lunes→Domingo
+const DAY_NAMES_FULL = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 
 const PERSON_COLORS = [
   { bg: "bg-blue-50", border: "border-blue-300", text: "text-blue-900", dot: "bg-blue-500", ring: "ring-blue-400" },
@@ -55,9 +55,6 @@ function to12h(t: string): string {
   const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h
   return `${h12}:${m.toString().padStart(2, "0")} ${p}`
 }
-function getWeekStart(date: Date): Date {
-  const d = new Date(date); d.setDate(d.getDate() - d.getDay()); d.setHours(0, 0, 0, 0); return d
-}
 function fmtISO(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
 }
@@ -66,16 +63,30 @@ function getWeekDates(ws: Date): Date[] {
 }
 
 export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
-  const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()))
+  const { isAdmin } = useAdmin()
+
+  // Task 9.1: Use getWeekStartMonday instead of getWeekStart
+  const [weekStart, setWeekStart] = useState(() => getWeekStartMonday(new Date()))
   const [shifts, setShifts] = useState<Shift[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [addingForDate, setAddingForDate] = useState<string | null>(null)
-  const [addStep, setAddStep] = useState<"slot" | "custom">("slot")
-  const [customStart, setCustomStart] = useState("08:00")
-  const [customEnd, setCustomEnd] = useState("17:00")
   const [alertMsg, setAlertMsg] = useState("")
   const [viewShift, setViewShift] = useState<Shift | null>(null)
+
+  // Task 9.3: ShiftDayPicker dialog state
+  const [showAddShiftDialog, setShowAddShiftDialog] = useState(false)
+
+  // Task 9.4: RepeatShiftConfig state — shown after a shift is created
+  const [repeatShiftData, setRepeatShiftData] = useState<{
+    date: string; startTime: string; endTime: string
+  } | null>(null)
+
+  // Task 9.5: Blocks state
+  const [blocks, setBlocks] = useState<ScheduleBlock[]>([])
+  const [showBlockDialog, setShowBlockDialog] = useState(false)
+
+  // Multi-day registration dialog
+  const [showMultiDayDialog, setShowMultiDayDialog] = useState(false)
 
   const weekDates = useMemo(() => getWeekDates(weekStart), [weekStart])
   const weekStartISO = fmtISO(weekStart)
@@ -84,9 +95,7 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
   // Build a color map for all people
   const colorMap = useMemo(() => {
     const map: Record<string, typeof PERSON_COLORS[0]> = {}
-    // Include people from props
     people.forEach((p, i) => { map[p.name] = PERSON_COLORS[i % PERSON_COLORS.length] })
-    // Also include any names from shifts not in people list
     shifts.forEach((s) => {
       if (!map[s.personName]) {
         const idx = Object.keys(map).length
@@ -105,11 +114,20 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
     finally { setLoading(false) }
   }, [weekStartISO])
 
-  useEffect(() => { loadShifts() }, [loadShifts])
+  // Task 9.5: Load blocks alongside shifts
+  const loadBlocks = useCallback(async () => {
+    try {
+      const data = await fetchBlocks(weekStartISO)
+      if (!data.error) setBlocks(Array.isArray(data) ? data : [])
+    } catch (e) { console.error("Error loading blocks:", e) }
+  }, [weekStartISO])
+
+  useEffect(() => { loadShifts(); loadBlocks() }, [loadShifts, loadBlocks])
 
   const goToPrevWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d) }
   const goToNextWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d) }
-  const goToCurrentWeek = () => setWeekStart(getWeekStart(new Date()))
+  // Task 9.1: Use getWeekStartMonday for "go to current week"
+  const goToCurrentWeek = () => setWeekStart(getWeekStartMonday(new Date()))
 
   const getShiftsForDay = (dateISO: string) => shifts.filter((s) => s.date === dateISO)
 
@@ -118,49 +136,87 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
     return date.getDate() === t.getDate() && date.getMonth() === t.getMonth() && date.getFullYear() === t.getFullYear()
   }
 
-  const handleTapDay = (dateISO: string) => {
+  // Task 9.5: Check if a day has blocks for the current person
+  const getBlocksForDay = useCallback((dateISO: string): ScheduleBlock[] => {
+    return blocks.filter((b) => {
+      if (dateISO < b.startDate || dateISO > b.endDate) return false
+      return true
+    })
+  }, [blocks])
+
+  // Task 9.3: Open ShiftDayPicker dialog
+  const handleOpenAddShift = () => {
     if (!personName) {
       setAlertMsg("Primero debes seleccionar tu perfil en la pantalla principal para poder asignar turnos.")
       return
     }
-    setAddingForDate(dateISO)
-    setAddStep("slot")
+    setShowAddShiftDialog(true)
   }
 
-  const handleQuickSlot = async (slot: typeof QUICK_SLOTS[0]) => {
-    if (!addingForDate || !personName) return
-    await saveShift(addingForDate, slot.start, slot.end)
-  }
+  // Task 9.3 + 9.5: Handle shift selected from ShiftDayPicker
+  const handleShiftSelected = async (date: string, startTime: string, endTime: string) => {
+    if (!personName) return
 
-  const handleCustomSave = async () => {
-    if (!addingForDate || !personName) return
-    if (customStart >= customEnd) {
-      setAlertMsg("La hora de fin debe ser después de la hora de inicio.")
+    // Task 9.5: Check block conflicts before saving
+    const blockConflict = checkBlockConflicts(personName, date, startTime, endTime, blocks)
+    if (blockConflict) {
+      const reason = blockConflict.reason ? ` Motivo: ${blockConflict.reason}` : ""
+      setAlertMsg(
+        `No se puede crear el turno. ${personName} tiene un bloqueo de horario del ${blockConflict.startDate} al ${blockConflict.endDate}.${reason}`
+      )
       return
     }
-    await saveShift(addingForDate, customStart, customEnd)
-  }
 
-  const saveShift = async (date: string, start: string, end: string) => {
+    // Check for overlaps with own shifts
     const dayShifts = getShiftsForDay(date)
-    const myOverlap = dayShifts.filter((s) => s.personName === personName).some((s) => start < s.endTime && end > s.startTime)
+    const myOverlap = dayShifts
+      .filter((s) => s.personName === personName)
+      .some((s) => startTime < s.endTime && endTime > s.startTime)
     if (myOverlap) {
       setAlertMsg("Ya tienes un turno en ese horario. Elimina el anterior primero o elige otro horario.")
       return
     }
-    const otherOverlaps = dayShifts.filter((s) => s.personName !== personName && start < s.endTime && end > s.startTime)
+
+    // Warn about overlaps with others
+    const otherOverlaps = dayShifts
+      .filter((s) => s.personName !== personName && startTime < s.endTime && endTime > s.startTime)
     if (otherOverlaps.length > 0) {
       const names = [...new Set(otherOverlaps.map((s) => s.personName))].join(", ")
       setAlertMsg(`Nota: ${names} también tiene turno en ese horario. Se guardará tu turno de todas formas.`)
     }
+
     setSaving(true)
     try {
-      await postScheduleShift({ action: "add", date, personName, startTime: start, endTime: end })
-      setShifts((prev) => [...prev, { rowIndex: Date.now(), date, personName, startTime: start, endTime: end }])
-      setAddingForDate(null)
+      await postScheduleShift({ action: "add", date, personName, startTime, endTime })
+      setShifts((prev) => [...prev, { rowIndex: Date.now(), date, personName, startTime, endTime }])
+      setShowAddShiftDialog(false)
+
+      // Task 9.4: After saving, offer to make it repeating
+      setRepeatShiftData({ date, startTime, endTime })
+
       setTimeout(() => { loadShifts() }, 1500)
     } catch (e: any) {
       setAlertMsg(e.message || "Error al guardar el turno.")
+    } finally { setSaving(false) }
+  }
+
+  // Task 9.4: Handle repeat shift confirmation
+  const handleRepeatConfirm = async (data: { frequency: "daily" | "weekly"; endDate: string }) => {
+    if (!repeatShiftData || !personName) return
+    setSaving(true)
+    try {
+      await postScheduleRepeat({
+        personName,
+        date: repeatShiftData.date,
+        startTime: repeatShiftData.startTime,
+        endTime: repeatShiftData.endTime,
+        frequency: data.frequency,
+        endDate: data.endDate,
+      })
+      setRepeatShiftData(null)
+      loadShifts()
+    } catch (e: any) {
+      setAlertMsg(e.message || "Error al crear turno repetitivo.")
     } finally { setSaving(false) }
   }
 
@@ -173,15 +229,35 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
     finally { setSaving(false) }
   }
 
+  const handleMultiDayConfirm = async (records: Array<{ date: string; startTime: string; endTime: string }>) => {
+    if (!personName) return
+    setSaving(true)
+    try {
+      for (const record of records) {
+        const [y, mo, d] = record.date.split("-").map(Number)
+        const [sh, sm] = record.startTime.split(":").map(Number)
+        const [eh, em] = record.endTime.split(":").map(Number)
+        const clockIn = new Date(y, mo - 1, d, sh, sm, 0, 0).toISOString()
+        const clockOut = new Date(y, mo - 1, d, eh, em, 0, 0).toISOString()
+        await postHistoricalEntry(personName, clockIn, clockOut)
+      }
+      setShowMultiDayDialog(false)
+      setAlertMsg(`Registro multi-día completado: ${records.length} días registrados para ${personName}.`)
+      loadShifts()
+    } catch (e: any) {
+      setAlertMsg(e.message || "Error al crear registro multi-día.")
+    } finally { setSaving(false) }
+  }
+
   // Unique people who have shifts this week
   const activeNames = useMemo(() => {
     const names = new Set(shifts.map((s) => s.personName))
     return [...names]
   }, [shifts])
 
+  // Task 9.1: Week label shows Monday–Sunday range
   const weekEndDate = new Date(weekStart); weekEndDate.setDate(weekEndDate.getDate() + 6)
   const weekLabel = `${weekStart.getDate()} ${weekStart.toLocaleDateString("es-ES", { month: "short" })} – ${weekEndDate.getDate()} ${weekEndDate.toLocaleDateString("es-ES", { month: "short", year: "numeric" })}`
-  const addingDateObj = addingForDate ? new Date(addingForDate + "T12:00:00") : null
 
   return (
     <div className="space-y-5">
@@ -192,16 +268,45 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
               <CalendarDays className="h-6 w-6" />
               Turnos de la Semana
             </CardTitle>
-            <Button variant="outline" onClick={loadShifts} disabled={loading} className="h-11 w-11 p-0">
-              <RefreshCw className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} />
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* Multi-day registration button */}
+              {personName && (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowMultiDayDialog(true)}
+                  className="h-11 px-3 text-sm"
+                >
+                  <CalendarRange className="h-4 w-4 mr-1" />
+                  Multi-Día
+                </Button>
+              )}
+              {/* Task 9.5: Admin-only button to create blocks */}
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowBlockDialog(true)}
+                  className="h-11 px-3 text-sm"
+                >
+                  <Ban className="h-4 w-4 mr-1" />
+                  Bloquear
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => { loadShifts(); loadBlocks() }} disabled={loading} className="h-11 w-11 p-0">
+                <RefreshCw className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Task 9.2: Navigation buttons with outline variant, border, contrasting background, adequate touch size */}
           <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3">
-            <Button variant="ghost" onClick={goToPrevWeek} className="h-12 w-12 p-0"><ChevronLeft className="h-6 w-6" /></Button>
+            <Button variant="outline" onClick={goToPrevWeek} className="h-12 w-12 p-0 border-2 bg-white hover:bg-gray-100">
+              <ChevronLeft className="h-6 w-6" />
+            </Button>
             <button onClick={goToCurrentWeek} className="text-lg font-bold text-gray-900 hover:text-blue-600 transition-colors">{weekLabel}</button>
-            <Button variant="ghost" onClick={goToNextWeek} className="h-12 w-12 p-0"><ChevronRight className="h-6 w-6" /></Button>
+            <Button variant="outline" onClick={goToNextWeek} className="h-12 w-12 p-0 border-2 bg-white hover:bg-gray-100">
+              <ChevronRight className="h-6 w-6" />
+            </Button>
           </div>
 
           {personName && (
@@ -247,9 +352,18 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
             </div>
           )}
 
-          <p className="text-sm text-gray-600">
-            Toca <strong>Agregar</strong> en un día para añadir tu turno. Toca un turno existente para ver detalles.
-          </p>
+          {/* Task 9.3: Updated instruction text */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-600">
+              Toca <strong>Agregar Turno</strong> para asignar un turno. Toca un turno existente para ver detalles.
+            </p>
+            {/* Task 9.3: Single "Agregar Turno" button that opens ShiftDayPicker */}
+            {personName && (
+              <Button variant="action" onClick={handleOpenAddShift} disabled={saving} className="h-10 px-3 text-sm shrink-0 ml-2">
+                <Plus className="h-4 w-4 mr-1" />Agregar Turno
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -259,24 +373,47 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
           const dateISO = fmtISO(date)
           const today = isToday(date)
           const dayShifts = getShiftsForDay(dateISO)
-          // Sort shifts by start time
           const sorted = [...dayShifts].sort((a, b) => a.startTime.localeCompare(b.startTime))
+
+          // Task 9.5: Check for blocks on this day
+          const dayBlocks = getBlocksForDay(dateISO)
+          const hasBlocks = dayBlocks.length > 0
 
           return (
             <Card key={dateISO} className={`overflow-hidden ${today ? "ring-2 ring-blue-400 border-blue-300" : ""}`}>
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
+                    {/* Task 9.1: DAY_NAMES_FULL[dayIdx] now maps correctly Mon→Sun */}
                     <span className={`text-lg font-bold ${today ? "text-blue-600" : "text-gray-900"}`}>{DAY_NAMES_FULL[dayIdx]}</span>
                     <span className="text-base text-gray-600">{date.getDate()}/{date.getMonth() + 1}</span>
                     {today && <Badge className="bg-blue-100 text-blue-700 text-xs px-2">Hoy</Badge>}
+                    {/* Task 9.5: Block indicator */}
+                    {hasBlocks && (
+                      <Badge variant="outline" className="bg-red-50 border-red-300 text-red-700 text-xs px-2">
+                        <Ban className="h-3 w-3 mr-1" />Bloqueado
+                      </Badge>
+                    )}
                   </div>
-                  {personName && (
-                    <Button variant="outline" onClick={() => handleTapDay(dateISO)} disabled={saving} className="h-10 px-3 text-sm">
-                      <Plus className="h-4 w-4 mr-1" />Agregar
-                    </Button>
-                  )}
                 </div>
+
+                {/* Task 9.5: Show block details */}
+                {hasBlocks && (
+                  <div className="space-y-1">
+                    {dayBlocks.map((block, bIdx) => (
+                      <div key={`block-${bIdx}`} className="flex items-center gap-2 p-2 rounded-lg bg-red-50 border border-red-200 text-sm">
+                        <ShieldAlert className="h-4 w-4 text-red-500 shrink-0" />
+                        <span className="text-red-800">
+                          <strong>{block.personName}</strong>
+                          {block.startTime && block.endTime
+                            ? ` — ${to12h(block.startTime)} a ${to12h(block.endTime)}`
+                            : " — Todo el día"}
+                          {block.reason && <span className="text-red-600 ml-1">({block.reason})</span>}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* All shifts for this day, color-coded */}
                 {sorted.length > 0 ? (
@@ -315,93 +452,54 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
         })}
       </div>
 
-      {/* Add Shift Dialog */}
-      <Dialog open={!!addingForDate} onOpenChange={(open) => { if (!open) setAddingForDate(null) }}>
+      {/* Task 9.3: Add Shift Dialog with ShiftDayPicker */}
+      <Dialog open={showAddShiftDialog} onOpenChange={setShowAddShiftDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl flex items-center gap-2">
               <Plus className="h-6 w-6 text-blue-600" />Agregar Turno
             </DialogTitle>
             <DialogDescription className="text-base">
-              {addingDateObj && (
-                <span className="text-gray-700">
-                  <strong>{personName}</strong> — {addingDateObj.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}
-                </span>
-              )}
+              <span className="text-gray-700">
+                <strong>{personName}</strong> — Selecciona día y horario
+              </span>
             </DialogDescription>
           </DialogHeader>
 
-          {/* Show existing shifts for this day so user can see what's taken */}
-          {addingForDate && getShiftsForDay(addingForDate).length > 0 && (
-            <div className="space-y-2 pb-2 border-b">
-              <p className="text-sm font-medium text-gray-700">Turnos ya asignados este día:</p>
-              {getShiftsForDay(addingForDate).sort((a, b) => a.startTime.localeCompare(b.startTime)).map((s) => {
-                const c = colorMap[s.personName] || PERSON_COLORS[0]
-                return (
-                  <div key={s.rowIndex} className={`flex items-center justify-between p-2 rounded-lg ${c.bg} border ${c.border}`}>
-                    <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${c.dot}`} />
-                      <span className={`text-sm font-medium ${c.text}`}>{s.personName}</span>
-                    </div>
-                    <span className={`text-sm font-mono ${c.text}`}>{to12h(s.startTime)} – {to12h(s.endTime)}</span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+          <ShiftDayPicker
+            weekStart={weekStart}
+            onShiftSelected={handleShiftSelected}
+          />
 
-          {addStep === "slot" && (
-            <div className="space-y-4 py-2">
-              <p className="text-base text-gray-700 font-medium">Elige un horario:</p>
-              <div className="space-y-3">
-                {QUICK_SLOTS.map((slot) => (
-                  <Button key={slot.label} variant="outline" onClick={() => handleQuickSlot(slot)} disabled={saving}
-                    className="w-full h-16 flex items-center justify-between px-5 text-left rounded-xl border-2 hover:border-blue-400 hover:bg-blue-50">
-                    <div>
-                      <span className="text-lg font-semibold text-gray-900 block">{slot.label}</span>
-                      <span className="text-sm text-gray-600">{slot.sub}</span>
-                    </div>
-                    {saving ? <RefreshCw className="h-5 w-5 animate-spin text-gray-400" /> : <Clock className="h-5 w-5 text-gray-400" />}
-                  </Button>
-                ))}
-              </div>
-              <div className="pt-2 border-t">
-                <Button variant="ghost" onClick={() => setAddStep("custom")} className="w-full h-12 text-base text-blue-600 hover:text-blue-700">
-                  Elegir horario personalizado...
-                </Button>
-              </div>
-            </div>
-          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddShiftDialog(false)} className="h-12 text-base">
+              Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-          {addStep === "custom" && (
-            <div className="space-y-4 py-2">
-              <p className="text-base text-gray-700 font-medium">Horario personalizado:</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Hora inicio</Label>
-                  <Input type="time" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="mt-1" />
-                  <span className="text-sm text-gray-500 mt-1 block">{to12h(customStart)}</span>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Hora fin</Label>
-                  <Input type="time" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="mt-1" />
-                  <span className="text-sm text-gray-500 mt-1 block">{to12h(customEnd)}</span>
-                </div>
-              </div>
-              <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
-                <Button variant="outline" onClick={() => setAddStep("slot")} className="h-12 text-base">Volver</Button>
-                <Button onClick={handleCustomSave} disabled={saving} className="h-12 text-base bg-blue-600 hover:bg-blue-700">
-                  {saving ? <RefreshCw className="h-5 w-5 animate-spin mr-2" /> : <Check className="h-5 w-5 mr-2" />}
-                  Guardar Turno
-                </Button>
-              </DialogFooter>
-            </div>
-          )}
+      {/* Task 9.4: Repeat Shift Dialog — shown after creating a shift */}
+      <Dialog open={!!repeatShiftData} onOpenChange={(open) => { if (!open) setRepeatShiftData(null) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl flex items-center gap-2">
+              <Repeat className="h-6 w-6 text-blue-600" />Hacer Repetitivo
+            </DialogTitle>
+            <DialogDescription className="text-base text-gray-700">
+              ¿Quieres que este turno se repita automáticamente?
+            </DialogDescription>
+          </DialogHeader>
 
-          {addStep === "slot" && (
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setAddingForDate(null)} className="h-12 text-base">Cancelar</Button>
-            </DialogFooter>
+          {repeatShiftData && (
+            <RepeatShiftConfig
+              personName={personName}
+              date={repeatShiftData.date}
+              startTime={repeatShiftData.startTime}
+              endTime={repeatShiftData.endTime}
+              onConfirm={handleRepeatConfirm}
+              onCancel={() => setRepeatShiftData(null)}
+            />
           )}
         </DialogContent>
       </Dialog>
@@ -461,6 +559,34 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
               </Button>
             )}
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Task 9.5: Block Schedule Dialog (admin only) */}
+      <BlockScheduleDialog
+        people={people.map((p) => ({ name: p.name }))}
+        open={showBlockDialog}
+        onOpenChange={setShowBlockDialog}
+        onBlockCreated={() => { loadBlocks(); loadShifts() }}
+      />
+
+      {/* Multi-Day Registration Dialog */}
+      <Dialog open={showMultiDayDialog} onOpenChange={setShowMultiDayDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl flex items-center gap-2">
+              <CalendarRange className="h-6 w-6 text-blue-600" />Registro Multi-Día
+            </DialogTitle>
+            <DialogDescription className="text-base text-gray-700">
+              Registra turnos continuos de varios días para <strong>{personName}</strong>
+            </DialogDescription>
+          </DialogHeader>
+
+          <MultiDayRegistration
+            personName={personName}
+            onConfirm={handleMultiDayConfirm}
+            onCancel={() => setShowMultiDayDialog(false)}
+          />
         </DialogContent>
       </Dialog>
 

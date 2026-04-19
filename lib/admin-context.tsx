@@ -4,13 +4,16 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from "
 
 interface AdminAlert {
   id: string;
-  type: "overlap-same" | "overlap-cross" | "inconsistency";
+  type: "overlap-same" | "overlap-cross" | "inconsistency" | "no-show" | "multi-day";
   message: string;
   personName: string;
   otherPerson?: string;
   date: string;
   timestamp: string;
   resolved: boolean;
+  entryRowIndex?: number;
+  approvedBy?: string;
+  approvalDate?: string;
 }
 
 interface AdminContextType {
