@@ -63,7 +63,7 @@ try {
                 json_error('Faltan datos requeridos (cuidador, tipo, monto)', 400);
             }
 
-            if (!in_array($type, ['gasto', 'ingreso'])) {
+            if (!in_array($type, ['expense', 'income'])) {
                 json_error('Tipo inválido. Debe ser "gasto" o "ingreso"', 400);
             }
 
