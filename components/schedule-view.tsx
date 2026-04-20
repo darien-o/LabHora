@@ -15,12 +15,11 @@ import {
 import {
   ChevronLeft, ChevronRight, CalendarDays, RefreshCw,
   Plus, AlertTriangle, Clock, Trash2, UserCheck, Check, Eye,
-  Ban, ShieldAlert, Repeat, CalendarRange,
+  Ban, ShieldAlert, CalendarRange,
 } from "lucide-react"
-import { fetchSchedule, postScheduleShift, fetchBlocks, postScheduleRepeat, postHistoricalEntry } from "@/lib/api-client"
+import { fetchSchedule, postScheduleShift, fetchBlocks, postScheduleRepeat, postHistoricalEntry, postBlock } from "@/lib/api-client"
 import { getWeekStartMonday, checkBlockConflicts, type ScheduleBlock } from "@/lib/schedule-utils"
 import { ShiftDayPicker } from "@/components/shift-day-picker"
-import { RepeatShiftConfig } from "@/components/repeat-shift-config"
 import { BlockScheduleDialog } from "@/components/block-schedule-dialog"
 import { MultiDayRegistration } from "@/components/multi-day-registration"
 import { useAdmin } from "@/lib/admin-context"
@@ -75,6 +74,7 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
 
   // Task 9.3: ShiftDayPicker dialog state
   const [showAddShiftDialog, setShowAddShiftDialog] = useState(false)
+  const [preselectedDate, setPreselectedDate] = useState<string | null>(null)
 
   // Task 9.4: RepeatShiftConfig state — shown after a shift is created
   const [repeatShiftData, setRepeatShiftData] = useState<{
@@ -150,6 +150,17 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
       setAlertMsg("Primero debes seleccionar tu perfil en la pantalla principal para poder asignar turnos.")
       return
     }
+    setPreselectedDate(null)
+    setShowAddShiftDialog(true)
+  }
+
+  // Open ShiftDayPicker with a pre-selected day (skips day selection step)
+  const handleOpenAddShiftForDay = (dateISO: string) => {
+    if (!personName) {
+      setAlertMsg("Primero debes seleccionar tu perfil en la pantalla principal para poder asignar turnos.")
+      return
+    }
+    setPreselectedDate(dateISO)
     setShowAddShiftDialog(true)
   }
 
@@ -191,9 +202,6 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
       setShifts((prev) => [...prev, { rowIndex: Date.now(), date, personName, startTime, endTime }])
       setShowAddShiftDialog(false)
 
-      // Task 9.4: After saving, offer to make it repeating
-      setRepeatShiftData({ date, startTime, endTime })
-
       setTimeout(() => { loadShifts() }, 1500)
     } catch (e: any) {
       setAlertMsg(e.message || "Error al guardar el turno.")
@@ -214,6 +222,29 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
         endDate: data.endDate,
       })
       setRepeatShiftData(null)
+      loadShifts()
+    } catch (e: any) {
+      setAlertMsg(e.message || "Error al crear turno repetitivo.")
+    } finally { setSaving(false) }
+  }
+
+  // Handle repeat shift selected from ShiftDayPicker's integrated repeat toggle
+  const handleRepeatShiftSelected = async (date: string, startTime: string, endTime: string, repeat: { frequency: "daily" | "weekly"; endDate: string }) => {
+    if (!personName) return
+    setSaving(true)
+    try {
+      // First create the single shift
+      await postScheduleShift({ action: "add", date, personName, startTime, endTime })
+      // Then create the repeat instances
+      await postScheduleRepeat({
+        personName,
+        date,
+        startTime,
+        endTime,
+        frequency: repeat.frequency,
+        endDate: repeat.endDate,
+      })
+      setShowAddShiftDialog(false)
       loadShifts()
     } catch (e: any) {
       setAlertMsg(e.message || "Error al crear turno repetitivo.")
@@ -280,15 +311,15 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
                   Multi-Día
                 </Button>
               )}
-              {/* Task 9.5: Admin-only button to create blocks */}
-              {isAdmin && (
+              {/* Absence/block button — any user can mark their own absence */}
+              {personName && (
                 <Button
                   variant="outline"
                   onClick={() => setShowBlockDialog(true)}
                   className="h-11 px-3 text-sm"
                 >
                   <Ban className="h-4 w-4 mr-1" />
-                  Bloquear
+                  Ausencia
                 </Button>
               )}
               <Button variant="outline" onClick={() => { loadShifts(); loadBlocks() }} disabled={loading} className="h-11 w-11 p-0">
@@ -391,7 +422,7 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
                     {/* Task 9.5: Block indicator */}
                     {hasBlocks && (
                       <Badge variant="outline" className="bg-red-50 border-red-300 text-red-700 text-xs px-2">
-                        <Ban className="h-3 w-3 mr-1" />Bloqueado
+                        <Ban className="h-3 w-3 mr-1" />Ausente
                       </Badge>
                     )}
                   </div>
@@ -400,18 +431,37 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
                 {/* Task 9.5: Show block details */}
                 {hasBlocks && (
                   <div className="space-y-1">
-                    {dayBlocks.map((block, bIdx) => (
+                    {dayBlocks.map((block, bIdx) => {
+                      const isMyBlock = block.personName === personName
+                      return (
                       <div key={`block-${bIdx}`} className="flex items-center gap-2 p-2 rounded-lg bg-red-50 border border-red-200 text-sm">
                         <ShieldAlert className="h-4 w-4 text-red-500 shrink-0" />
-                        <span className="text-red-800">
+                        <span className="text-red-800 flex-1">
                           <strong>{block.personName}</strong>
                           {block.startTime && block.endTime
                             ? ` — ${to12h(block.startTime)} a ${to12h(block.endTime)}`
                             : " — Todo el día"}
                           {block.reason && <span className="text-red-600 ml-1">({block.reason})</span>}
                         </span>
+                        {(isMyBlock || isAdmin) && block.rowIndex && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-red-400 hover:text-red-600 shrink-0"
+                            onClick={async () => {
+                              try {
+                                await postBlock({ action: "remove", rowIndex: block.rowIndex })
+                                loadBlocks()
+                              } catch { setAlertMsg("Error al eliminar la ausencia.") }
+                            }}
+                            title="Eliminar ausencia"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
 
@@ -446,6 +496,18 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
                 ) : (
                   <p className="text-base text-gray-400 italic py-2">Sin turnos asignados</p>
                 )}
+
+                {/* Per-day add button — skips day selection step */}
+                {personName && (
+                  <Button
+                    variant="outline"
+                    onClick={() => handleOpenAddShiftForDay(dateISO)}
+                    disabled={saving}
+                    className="w-full h-10 text-sm border-dashed border-2 text-gray-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />Agregar turno
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )
@@ -468,7 +530,9 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
 
           <ShiftDayPicker
             weekStart={weekStart}
+            initialDate={preselectedDate}
             onShiftSelected={handleShiftSelected}
+            onRepeatConfirm={handleRepeatShiftSelected}
           />
 
           <DialogFooter>
@@ -476,31 +540,6 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
               Cancelar
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Task 9.4: Repeat Shift Dialog — shown after creating a shift */}
-      <Dialog open={!!repeatShiftData} onOpenChange={(open) => { if (!open) setRepeatShiftData(null) }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-xl flex items-center gap-2">
-              <Repeat className="h-6 w-6 text-blue-600" />Hacer Repetitivo
-            </DialogTitle>
-            <DialogDescription className="text-base text-gray-700">
-              ¿Quieres que este turno se repita automáticamente?
-            </DialogDescription>
-          </DialogHeader>
-
-          {repeatShiftData && (
-            <RepeatShiftConfig
-              personName={personName}
-              date={repeatShiftData.date}
-              startTime={repeatShiftData.startTime}
-              endTime={repeatShiftData.endTime}
-              onConfirm={handleRepeatConfirm}
-              onCancel={() => setRepeatShiftData(null)}
-            />
-          )}
         </DialogContent>
       </Dialog>
 
@@ -568,6 +607,8 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
         open={showBlockDialog}
         onOpenChange={setShowBlockDialog}
         onBlockCreated={() => { loadBlocks(); loadShifts() }}
+        currentPersonName={personName}
+        isAdmin={isAdmin}
       />
 
       {/* Multi-Day Registration Dialog */}

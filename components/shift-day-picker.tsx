@@ -1,18 +1,24 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Check, ChevronLeft, Clock, Sun, Moon, Sunset, CalendarDays } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Check, ChevronLeft, Clock, Sun, Moon, Sunset, CalendarDays, Repeat } from "lucide-react"
 import { getWeekStartMonday } from "@/lib/schedule-utils"
+import { RepeatShiftConfig } from "@/components/repeat-shift-config"
 
 interface ShiftDayPickerProps {
   weekStart: Date
+  /** If provided, skip the day selection step and go straight to shift type */
+  initialDate?: string | null
   onShiftSelected: (date: string, startTime: string, endTime: string) => void
+  /** Called when user confirms a repeat configuration after selecting a shift */
+  onRepeatConfirm?: (date: string, startTime: string, endTime: string, repeat: { frequency: "daily" | "weekly"; endDate: string }) => void
 }
 
-type Step = "day" | "type" | "labor" | "custom"
+type Step = "day" | "type" | "labor" | "custom" | "repeat"
 
 const DAY_NAMES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 
@@ -38,11 +44,27 @@ function isToday(date: Date): boolean {
   )
 }
 
-export function ShiftDayPicker({ weekStart, onShiftSelected }: ShiftDayPickerProps) {
-  const [step, setStep] = useState<Step>("day")
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+export function ShiftDayPicker({ weekStart, initialDate, onShiftSelected, onRepeatConfirm }: ShiftDayPickerProps) {
+  const [step, setStep] = useState<Step>(initialDate ? "type" : "day")
+  const [selectedDate, setSelectedDate] = useState<string | null>(initialDate ?? null)
   const [customStart, setCustomStart] = useState("08:00")
   const [customEnd, setCustomEnd] = useState("17:00")
+  const [wantRepeat, setWantRepeat] = useState(false)
+  // Pending shift data for repeat config
+  const [pendingShift, setPendingShift] = useState<{ date: string; startTime: string; endTime: string } | null>(null)
+
+  // If initialDate changes (e.g. dialog reopened with different day), reset
+  useEffect(() => {
+    if (initialDate) {
+      setSelectedDate(initialDate)
+      setStep("type")
+    } else {
+      setStep("day")
+      setSelectedDate(null)
+    }
+    setWantRepeat(false)
+    setPendingShift(null)
+  }, [initialDate])
 
   const weekDates = useMemo(() => {
     const monday = getWeekStartMonday(weekStart)
@@ -61,6 +83,10 @@ export function ShiftDayPicker({ weekStart, onShiftSelected }: ShiftDayPickerPro
   const selectedDayLabel = useMemo(() => {
     if (!selectedDateObj) return ""
     const idx = weekDates.indexOf(selectedDateObj)
+    if (idx === -1) {
+      // Date not in current week — format directly
+      return `${selectedDateObj.getDate()}/${selectedDateObj.getMonth() + 1}`
+    }
     return `${DAY_NAMES[idx]} ${selectedDateObj.getDate()}/${selectedDateObj.getMonth() + 1}`
   }, [selectedDateObj, weekDates])
 
@@ -69,31 +95,77 @@ export function ShiftDayPicker({ weekStart, onShiftSelected }: ShiftDayPickerPro
     setStep("type")
   }
 
-  const handleFullDay = () => {
-    if (selectedDate) {
-      onShiftSelected(selectedDate, "00:00", "23:59")
+  const finishShift = (date: string, startTime: string, endTime: string) => {
+    if (wantRepeat && onRepeatConfirm) {
+      // Show repeat config instead of finishing
+      setPendingShift({ date, startTime, endTime })
+      setStep("repeat")
+    } else {
+      onShiftSelected(date, startTime, endTime)
     }
+  }
+
+  const handleFullDay = () => {
+    if (selectedDate) finishShift(selectedDate, "00:00", "23:59")
   }
 
   const handleLaborShift = (shift: (typeof LABOR_SHIFTS)[0]) => {
-    if (selectedDate) {
-      onShiftSelected(selectedDate, shift.start, shift.end)
-    }
+    if (selectedDate) finishShift(selectedDate, shift.start, shift.end)
   }
 
   const handleCustomSave = () => {
-    if (selectedDate) {
-      onShiftSelected(selectedDate, customStart, customEnd)
+    if (selectedDate) finishShift(selectedDate, customStart, customEnd)
+  }
+
+  const handleRepeatConfirm = (data: { frequency: "daily" | "weekly"; endDate: string }) => {
+    if (pendingShift && onRepeatConfirm) {
+      onRepeatConfirm(pendingShift.date, pendingShift.startTime, pendingShift.endTime, data)
     }
   }
 
   const goBack = () => {
-    if (step === "labor" || step === "custom") {
+    if (step === "repeat") {
+      setStep("type")
+      setPendingShift(null)
+    } else if (step === "labor" || step === "custom") {
       setStep("type")
     } else if (step === "type") {
+      if (initialDate) {
+        // Can't go back past the pre-selected date — just stay
+        return
+      }
       setStep("day")
       setSelectedDate(null)
     }
+  }
+
+  // ── Repeat toggle (shown in type, labor, custom steps) ──
+  const repeatToggle = onRepeatConfirm ? (
+    <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border">
+      <div className="flex items-center gap-2">
+        <Repeat className="h-4 w-4 text-blue-600" />
+        <span className="text-sm font-medium text-gray-700">Turno repetitivo</span>
+      </div>
+      <Switch
+        checked={wantRepeat}
+        onCheckedChange={setWantRepeat}
+        aria-label="Activar turno repetitivo"
+      />
+    </div>
+  ) : null
+
+  // ── Step: Repeat config ──
+  if (step === "repeat" && pendingShift) {
+    return (
+      <RepeatShiftConfig
+        personName=""
+        date={pendingShift.date}
+        startTime={pendingShift.startTime}
+        endTime={pendingShift.endTime}
+        onConfirm={handleRepeatConfirm}
+        onCancel={() => { setStep("type"); setPendingShift(null) }}
+      />
+    )
   }
 
   // ── Step 1: Day selection ──
@@ -137,13 +209,17 @@ export function ShiftDayPicker({ weekStart, onShiftSelected }: ShiftDayPickerPro
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" onClick={goBack} className="h-9 w-9 p-0">
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
+          {!initialDate && (
+            <Button variant="ghost" onClick={goBack} className="h-9 w-9 p-0">
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+          )}
           <p className="text-base font-medium text-gray-700">
             {selectedDayLabel} — Tipo de turno
           </p>
         </div>
+
+        {repeatToggle}
 
         <div className="space-y-3">
           <Button
@@ -199,6 +275,8 @@ export function ShiftDayPicker({ weekStart, onShiftSelected }: ShiftDayPickerPro
           </p>
         </div>
 
+        {repeatToggle}
+
         <div className="space-y-3">
           {LABOR_SHIFTS.map((shift) => {
             const Icon = shift.icon
@@ -237,6 +315,8 @@ export function ShiftDayPicker({ weekStart, onShiftSelected }: ShiftDayPickerPro
             {selectedDayLabel} — Horario Personalizado
           </p>
         </div>
+
+        {repeatToggle}
 
         <div className="grid grid-cols-2 gap-4">
           <div>

@@ -29,6 +29,9 @@ interface BlockScheduleDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onBlockCreated: () => void
+  /** Pre-select this person. Non-admin users can only create blocks for themselves. */
+  currentPersonName?: string
+  isAdmin?: boolean
 }
 
 export function BlockScheduleDialog({
@@ -36,10 +39,12 @@ export function BlockScheduleDialog({
   open,
   onOpenChange,
   onBlockCreated,
+  currentPersonName,
+  isAdmin = false,
 }: BlockScheduleDialogProps) {
   const { toast } = useToast()
 
-  const [personName, setPersonName] = useState("")
+  const [personName, setPersonName] = useState(currentPersonName || "")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [useTimeRange, setUseTimeRange] = useState(false)
@@ -52,7 +57,7 @@ export function BlockScheduleDialog({
   const [error, setError] = useState("")
 
   function resetForm() {
-    setPersonName("")
+    setPersonName(currentPersonName || "")
     setStartDate("")
     setEndDate("")
     setUseTimeRange(false)
@@ -104,8 +109,8 @@ export function BlockScheduleDialog({
       })
 
       toast({
-        title: "Bloqueo creado",
-        description: `Bloqueo para ${personName} del ${startDate} al ${endDate}`,
+        title: "Ausencia registrada",
+        description: `Ausencia para ${personName} del ${startDate} al ${endDate}`,
       })
 
       resetForm()
@@ -131,28 +136,34 @@ export function BlockScheduleDialog({
     }}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Bloquear Horario</DialogTitle>
+          <DialogTitle>Registrar Ausencia</DialogTitle>
           <DialogDescription>
-            Impide la asignación de turnos para un cuidador durante un período determinado.
+            Registra un período de ausencia para impedir la asignación de turnos.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-2">
-          {/* Cuidador */}
+          {/* Cuidador — admin can select anyone, regular users locked to themselves */}
           <div className="grid gap-2">
             <Label htmlFor="block-person">Cuidador</Label>
-            <Select value={personName} onValueChange={setPersonName}>
-              <SelectTrigger id="block-person">
-                <SelectValue placeholder="Seleccionar cuidador" />
-              </SelectTrigger>
-              <SelectContent>
-                {people.map((p) => (
-                  <SelectItem key={p.name} value={p.name}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {isAdmin ? (
+              <Select value={personName} onValueChange={setPersonName}>
+                <SelectTrigger id="block-person">
+                  <SelectValue placeholder="Seleccionar cuidador" />
+                </SelectTrigger>
+                <SelectContent>
+                  {people.map((p) => (
+                    <SelectItem key={p.name} value={p.name}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="h-10 px-3 flex items-center rounded-md border bg-muted text-sm font-medium">
+                {personName}
+              </div>
+            )}
           </div>
 
           {/* Fecha inicio */}
@@ -263,7 +274,7 @@ export function BlockScheduleDialog({
           </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving && <Loader2 className="animate-spin" />}
-            {saving ? "Guardando..." : "Guardar bloqueo"}
+            {saving ? "Guardando..." : "Guardar ausencia"}
           </Button>
         </DialogFooter>
       </DialogContent>
