@@ -14,6 +14,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Calendar,
   AlertTriangle,
@@ -26,11 +34,16 @@ import {
   Loader2,
   Pencil,
   Check,
+  Layers,
+  Receipt,
+  ArrowUpCircle,
+  ArrowDownCircle,
 } from "lucide-react";
 import { ConflictDialog } from "@/components/conflict-dialog";
 import { detectConflicts, type ConflictResult } from "@/lib/conflict-detector";
 import { useAdmin } from "@/lib/admin-context";
 import { getNextCalendarDay } from "@/lib/schedule-utils";
+import { postExpense } from "@/lib/api-client";
 
 interface Person {
   id: string;
@@ -50,9 +63,16 @@ interface PendingEntry {
   date: string;
   clockInTime: string;
   clockOutTime: string;
+  note: string;
   status: "pending" | "sending" | "success" | "error";
   errorMessage?: string;
-  addedAt: number; // timestamp for edit window
+  addedAt: number;
+}
+
+interface ExpenseItem {
+  type: "expense" | "income";
+  amount: string;
+  description: string;
 }
 
 interface BatchHistoricalDialogProps {
@@ -69,8 +89,6 @@ interface BatchHistoricalDialogProps {
   onComplete: () => void;
 }
 
-const EDIT_WINDOW_MS = 30 * 60 * 1000; // 30 minutes edit window for non-admin
-
 export function BatchHistoricalDialog({
   open,
   onOpenChange,
@@ -81,26 +99,29 @@ export function BatchHistoricalDialog({
   onComplete,
 }: BatchHistoricalDialogProps) {
   const { isAdmin, addAlert } = useAdmin();
-  const [selectedPerson, setSelectedPerson] = useState("");
+
+  // Auto-detect person
+  const [selectedPerson, setSelectedPerson] = useState(currentPersonName || "");
+  const [batchMode, setBatchMode] = useState(false);
+
+  // Form state
   const [currentDate, setCurrentDate] = useState("");
   const [currentClockIn, setCurrentClockIn] = useState("08:00");
   const [currentClockOut, setCurrentClockOut] = useState("17:00");
+  const [currentNote, setCurrentNote] = useState("");
+  const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
+  const [newExpenseType, setNewExpenseType] = useState<"expense" | "income">("expense");
+  const [newExpenseAmount, setNewExpenseAmount] = useState("");
+  const [newExpenseDesc, setNewExpenseDesc] = useState("");
+
+  // Batch entries
   const [entries, setEntries] = useState<PendingEntry[]>([]);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [currentNote, setCurrentNote] = useState("");
 
-  // Conflict dialog state
+  // Conflict dialog
   const [showConflictDialog, setShowConflictDialog] = useState(false);
-
-  // Preselect caregiver matching the active session profile
-  useEffect(() => {
-    if (open && currentPersonName && !selectedPerson) {
-      const match = people.find((p) => p.name === currentPersonName);
-      if (match) setSelectedPerson(match.name);
-    }
-  }, [open, currentPersonName, people, selectedPerson]);
   const [pendingConflicts, setPendingConflicts] = useState<ConflictResult[]>([]);
   const [pendingEntryData, setPendingEntryData] = useState<{
     date: string;
@@ -110,42 +131,12 @@ export function BatchHistoricalDialog({
 
   const today = new Date().toISOString().split("T")[0];
 
-  const totalDuration = useMemo(() => {
-    let totalMinutes = 0;
-    for (const entry of entries) {
-      const [inH, inM] = entry.clockInTime.split(":").map(Number);
-      const [outH, outM] = entry.clockOutTime.split(":").map(Number);
-      totalMinutes += outH * 60 + outM - (inH * 60 + inM);
+  // Auto-select person on open
+  useEffect(() => {
+    if (open && currentPersonName) {
+      setSelectedPerson(currentPersonName);
     }
-    const h = Math.floor(totalMinutes / 60);
-    const m = totalMinutes % 60;
-    return `${h}h ${m}m`;
-  }, [entries]);
-
-  const getDayName = (dateStr: string) => {
-    const date = new Date(dateStr + "T12:00:00");
-    return date.toLocaleDateString("es-ES", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-    });
-  };
-
-  const getEntryDuration = (clockIn: string, clockOut: string) => {
-    const [inH, inM] = clockIn.split(":").map(Number);
-    const [outH, outM] = clockOut.split(":").map(Number);
-    const mins = outH * 60 + outM - (inH * 60 + inM);
-    if (mins <= 0) return "Inválido";
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return `${h}h ${m}m`;
-  };
-
-  const canEditEntry = (entry: PendingEntry): boolean => {
-    if (isAdmin) return true;
-    if (entry.status !== "pending") return false;
-    return Date.now() - entry.addedAt < EDIT_WINDOW_MS;
-  };
+  }, [open, currentPersonName]);
 
   const validateEntry = (
     date: string,
@@ -163,18 +154,18 @@ export function BatchHistoricalDialog({
       return "La hora de salida debe ser posterior a la de entrada";
     if (clockInDT > new Date())
       return "No se pueden crear registros para fechas futuras";
+    if (clockOutDT > new Date())
+      return "La hora de salida debe ser anterior a la hora actual. Si necesitas programar un turno futuro, usa la pestaña «Programar».";
 
-    // Check overlap with OTHER pending entries for same person on same day
-    const newStart = clockInDT;
-    const newEnd = clockOutDT;
+    // Check overlap with pending batch entries
     for (const e of entries) {
-      if (e.id === editingId) continue; // skip the one being edited
+      if (e.id === editingId) continue;
       if (e.status === "error") continue;
       if (e.date !== date) continue;
 
       const eStart = new Date(`${e.date}T${e.clockInTime}`);
       const eEnd = new Date(`${e.date}T${e.clockOutTime}`);
-      if (newStart < eEnd && newEnd > eStart) {
+      if (clockInDT < eEnd && clockOutDT > eStart) {
         return `Se cruza con otro registro en la lista: ${e.clockInTime} → ${e.clockOutTime}`;
       }
     }
@@ -182,409 +173,340 @@ export function BatchHistoricalDialog({
     return null;
   };
 
-  const checkConflictsAndAdd = () => {
+  const handleAddExpense = () => {
+    const amount = parseFloat(newExpenseAmount);
+    if (!newExpenseDesc.trim() || isNaN(amount) || amount <= 0) return;
+    setExpenses((prev) => [...prev, { type: newExpenseType, amount: newExpenseAmount, description: newExpenseDesc.trim() }]);
+    setNewExpenseAmount("");
+    setNewExpenseDesc("");
+  };
+
+  const removeExpense = (idx: number) => {
+    setExpenses((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const checkConflictsAndSubmit = () => {
     setError("");
-    const validationError = validateEntry(
-      currentDate,
-      currentClockIn,
-      currentClockOut
-    );
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
+    const validationError = validateEntry(currentDate, currentClockIn, currentClockOut);
+    if (validationError) { setError(validationError); return; }
 
     const newStart = new Date(`${currentDate}T${currentClockIn}`);
     const newEnd = new Date(`${currentDate}T${currentClockOut}`);
 
-    // Check conflicts with existing time entries in the system
-    const conflicts = detectConflicts(
-      selectedPerson,
-      newStart,
-      newEnd,
-      timeEntries
-    );
+    const conflicts = detectConflicts(selectedPerson, newStart, newEnd, timeEntries);
 
     if (conflicts.length > 0) {
-      const samePersonConflicts = conflicts.filter(
-        (c) => c.type === "same-person"
-      );
-
-      // Same-person conflicts always block (must adjust)
+      const samePersonConflicts = conflicts.filter((c) => c.type === "same-person");
       if (samePersonConflicts.length > 0) {
         setPendingConflicts(conflicts);
-        setPendingEntryData({
-          date: currentDate,
-          clockIn: currentClockIn,
-          clockOut: currentClockOut,
-        });
+        setPendingEntryData({ date: currentDate, clockIn: currentClockIn, clockOut: currentClockOut });
         setShowConflictDialog(true);
         return;
       }
-
-      // Cross-person conflicts: show warning, allow force
       setPendingConflicts(conflicts);
-      setPendingEntryData({
-        date: currentDate,
-        clockIn: currentClockIn,
-        clockOut: currentClockOut,
-      });
+      setPendingEntryData({ date: currentDate, clockIn: currentClockIn, clockOut: currentClockOut });
       setShowConflictDialog(true);
       return;
     }
 
-    // No conflicts, add directly
-    doAddEntry(currentDate, currentClockIn, currentClockOut);
-  };
-
-  const doAddEntry = (date: string, clockIn: string, clockOut: string) => {
-    if (editingId) {
-      // Update existing entry
-      setEntries((prev) =>
-        prev
-          .map((e) =>
-            e.id === editingId
-              ? { ...e, date, clockInTime: clockIn, clockOutTime: clockOut }
-              : e
-          )
-          .sort((a, b) =>
-            a.date === b.date
-              ? a.clockInTime.localeCompare(b.clockInTime)
-              : a.date.localeCompare(b.date)
-          )
-      );
-      setEditingId(null);
+    if (batchMode) {
+      doAddToBatch(currentDate, currentClockIn, currentClockOut);
     } else {
-      const newEntry: PendingEntry = {
-        id: `${date}-${Date.now()}`,
-        date,
-        clockInTime: clockIn,
-        clockOutTime: clockOut,
-        status: "pending",
-        addedAt: Date.now(),
-      };
-      setEntries((prev) =>
-        [...prev, newEntry].sort((a, b) =>
-          a.date === b.date
-            ? a.clockInTime.localeCompare(b.clockInTime)
-            : a.date.localeCompare(b.date)
-        )
-      );
+      doSubmitSingle();
     }
-
-    // Advance date to next calendar day (including weekends)
-    const nextDateStr = getNextCalendarDay(date);
-    if (nextDateStr <= today) {
-      setCurrentDate(nextDateStr);
-    }
-    setCurrentNote("");
   };
 
-  const handleConflictAdjust = () => {
-    setShowConflictDialog(false);
-    // Keep the form as-is so user can adjust
+  const doAddToBatch = (date: string, clockIn: string, clockOut: string) => {
+    const newEntry: PendingEntry = {
+      id: `${date}-${Date.now()}`,
+      date,
+      clockInTime: clockIn,
+      clockOutTime: clockOut,
+      note: currentNote,
+      status: "pending",
+      addedAt: Date.now(),
+    };
+    setEntries((prev) =>
+      [...prev, newEntry].sort((a, b) =>
+        a.date === b.date ? a.clockInTime.localeCompare(b.clockInTime) : a.date.localeCompare(b.date)
+      )
+    );
+    // Advance date
+    const nextDateStr = getNextCalendarDay(date);
+    if (nextDateStr <= today) setCurrentDate(nextDateStr);
+    setCurrentNote("");
+    setExpenses([]);
+  };
+
+  const doSubmitSingle = async () => {
+    setIsSubmitting(true);
+    try {
+      const clockIn = new Date(`${currentDate}T${currentClockIn}`).toISOString();
+      const clockOut = new Date(`${currentDate}T${currentClockOut}`).toISOString();
+      await onSubmitEntry(selectedPerson, clockIn, clockOut);
+
+      // TODO: If expenses exist, we'd need the rowIndex of the created entry to associate them.
+      // For now, expenses are informational — they can be added later from the history view.
+
+      setCurrentNote("");
+      setExpenses([]);
+      onComplete();
+      showSuccess();
+    } catch (err: any) {
+      setError(err.message || "Error al guardar el registro");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const [successMsg, setSuccessMsg] = useState("");
+  const showSuccess = () => {
+    setSuccessMsg("¡Registro guardado correctamente!");
+    setTimeout(() => setSuccessMsg(""), 3000);
+  };
+
+  const submitBatch = async () => {
+    if (entries.length === 0 || !selectedPerson) return;
+    setIsSubmitting(true);
+    const pendingEntries = entries.filter((e) => e.status === "pending" || e.status === "error");
+
+    for (const entry of pendingEntries) {
+      setEntries((prev) => prev.map((e) => e.id === entry.id ? { ...e, status: "sending" as const } : e));
+      try {
+        const clockIn = new Date(`${entry.date}T${entry.clockInTime}`).toISOString();
+        const clockOut = new Date(`${entry.date}T${entry.clockOutTime}`).toISOString();
+        await onSubmitEntry(selectedPerson, clockIn, clockOut);
+        setEntries((prev) => prev.map((e) => e.id === entry.id ? { ...e, status: "success" as const } : e));
+      } catch (err: any) {
+        setEntries((prev) => prev.map((e) =>
+          e.id === entry.id ? { ...e, status: "error" as const, errorMessage: err.message || "Error" } : e
+        ));
+      }
+    }
+    setIsSubmitting(false);
   };
 
   const handleConflictForce = () => {
     if (!pendingEntryData) return;
     setShowConflictDialog(false);
-
-    // Create admin alerts for cross-person conflicts
     for (const conflict of pendingConflicts) {
       if (conflict.type === "cross-person") {
         addAlert({
           type: "overlap-cross",
-          message: `${selectedPerson} y ${conflict.existingPerson} cubren el mismo horario el ${pendingEntryData.date}. ${selectedPerson}: ${pendingEntryData.clockIn}–${pendingEntryData.clockOut}, ${conflict.existingPerson}: ${conflict.existingStart.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}–${conflict.existingEnd.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}`,
+          message: `${selectedPerson} y ${conflict.existingPerson} cubren el mismo horario el ${pendingEntryData.date}.`,
           personName: selectedPerson,
           otherPerson: conflict.existingPerson,
           date: pendingEntryData.date,
         });
       }
     }
-
-    doAddEntry(
-      pendingEntryData.date,
-      pendingEntryData.clockIn,
-      pendingEntryData.clockOut
-    );
-  };
-
-  const handleConflictCancel = () => {
-    setShowConflictDialog(false);
-  };
-
-  const startEdit = (entry: PendingEntry) => {
-    setEditingId(entry.id);
-    setCurrentDate(entry.date);
-    setCurrentClockIn(entry.clockInTime);
-    setCurrentClockOut(entry.clockOutTime);
-    setError("");
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setCurrentDate("");
-    setCurrentClockIn("08:00");
-    setCurrentClockOut("17:00");
-    setCurrentNote("");
-  };
-
-  const removeEntry = (id: string) => {
-    setEntries((prev) => prev.filter((e) => e.id !== id));
-    if (editingId === id) cancelEdit();
-  };
-
-  const duplicateLastTimes = () => {
-    if (entries.length > 0) {
-      const last = entries[entries.length - 1];
-      setCurrentClockIn(last.clockInTime);
-      setCurrentClockOut(last.clockOutTime);
+    if (batchMode) {
+      doAddToBatch(pendingEntryData.date, pendingEntryData.clockIn, pendingEntryData.clockOut);
+    } else {
+      doSubmitSingle();
     }
-  };
-
-  const submitAll = async () => {
-    if (entries.length === 0 || !selectedPerson) return;
-
-    setIsSubmitting(true);
-    const pendingEntries = entries.filter(
-      (e) => e.status === "pending" || e.status === "error"
-    );
-
-    for (const entry of pendingEntries) {
-      setEntries((prev) =>
-        prev.map((e) =>
-          e.id === entry.id ? { ...e, status: "sending" as const } : e
-        )
-      );
-
-      try {
-        const clockIn = new Date(
-          `${entry.date}T${entry.clockInTime}`
-        ).toISOString();
-        const clockOut = new Date(
-          `${entry.date}T${entry.clockOutTime}`
-        ).toISOString();
-        await onSubmitEntry(selectedPerson, clockIn, clockOut);
-
-        setEntries((prev) =>
-          prev.map((e) =>
-            e.id === entry.id ? { ...e, status: "success" as const } : e
-          )
-        );
-      } catch (err: any) {
-        setEntries((prev) =>
-          prev.map((e) =>
-            e.id === entry.id
-              ? {
-                  ...e,
-                  status: "error" as const,
-                  errorMessage: err.message || "Error desconocido",
-                }
-              : e
-          )
-        );
-      }
-    }
-
-    setIsSubmitting(false);
   };
 
   const handleClose = () => {
-    const hasSuccess = entries.some((e) => e.status === "success");
+    const hasSuccess = entries.some((e) => e.status === "success") || successMsg !== "";
     if (hasSuccess) onComplete();
     onOpenChange(false);
-    setSelectedPerson("");
+    setSelectedPerson(currentPersonName || "");
     setCurrentDate("");
     setCurrentClockIn("08:00");
     setCurrentClockOut("17:00");
     setCurrentNote("");
+    setExpenses([]);
     setEntries([]);
     setError("");
+    setSuccessMsg("");
     setIsSubmitting(false);
-    setEditingId(null);
+    setBatchMode(false);
   };
 
-  const pendingCount = entries.filter(
-    (e) => e.status === "pending" || e.status === "error"
-  ).length;
+  const getDayName = (dateStr: string) => {
+    const date = new Date(dateStr + "T12:00:00");
+    return date.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" });
+  };
+
+  const getEntryDuration = (clockIn: string, clockOut: string) => {
+    const [inH, inM] = clockIn.split(":").map(Number);
+    const [outH, outM] = clockOut.split(":").map(Number);
+    const mins = outH * 60 + outM - (inH * 60 + inM);
+    if (mins <= 0) return "Inválido";
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h}h ${m}m`;
+  };
+
+  const pendingCount = entries.filter((e) => e.status === "pending" || e.status === "error").length;
   const successCount = entries.filter((e) => e.status === "success").length;
   const allDone = entries.length > 0 && pendingCount === 0 && !isSubmitting;
 
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5 text-blue-500" />
-              Registros Históricos por Lote
+              Registrar Día Trabajado
             </DialogTitle>
             <DialogDescription>
-              Agrega múltiples registros de trabajo pasados. Puedes agregar
-              varios horarios para el mismo día.
+              Registra un horario de trabajo pasado.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Person selector — avatar grid */}
-            <div>
-              <Label className="text-sm font-medium">Cuidador</Label>
-              <div className="grid grid-cols-3 gap-2 mt-2">
-                {people.map((p) => {
-                  const isSelected = selectedPerson === p.name;
-                  const initial = p.name.charAt(0).toUpperCase();
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      disabled={isSubmitting}
-                      onClick={() => setSelectedPerson(p.name)}
-                      className={`relative flex flex-col items-center gap-1 p-2 rounded-lg border-2 transition-all ${
-                        isSelected
-                          ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200"
-                          : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
-                      } ${isSubmitting ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                    >
-                      <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold ${
-                          isSelected
-                            ? "bg-blue-500 text-white"
-                            : "bg-gray-200 text-gray-600"
-                        }`}
-                      >
-                        {initial}
-                      </div>
-                      <span className="text-xs font-medium text-center leading-tight truncate w-full">
-                        {p.name}
-                      </span>
-                      {isSelected && (
-                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
-                          <Check className="h-3 w-3 text-white" />
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
+            {/* Person — auto-detected, only admin can change */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold">
+                  {selectedPerson.charAt(0).toUpperCase()}
+                </div>
+                <span className="font-medium text-gray-900">{selectedPerson || "Sin seleccionar"}</span>
               </div>
+              {isAdmin && (
+                <Select value={selectedPerson} onValueChange={setSelectedPerson}>
+                  <SelectTrigger className="w-[140px] h-8 text-xs">
+                    <SelectValue placeholder="Cambiar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {people.map((p) => (
+                      <SelectItem key={p.id} value={p.name} className="text-sm">
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Batch mode toggle */}
+            <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border">
+              <div className="flex items-center gap-2">
+                <Layers className="h-4 w-4 text-gray-600" />
+                <span className="text-sm font-medium text-gray-700">Modo por lotes</span>
+              </div>
+              <Switch checked={batchMode} onCheckedChange={setBatchMode} aria-label="Activar modo por lotes" />
             </div>
 
             {/* Entry form */}
-            <div
-              className={`p-3 border rounded-lg space-y-3 ${editingId ? "bg-yellow-50 border-yellow-300" : "bg-gray-50"}`}
-            >
-              <Label className="text-sm font-medium flex items-center gap-2">
-                {editingId ? (
-                  <>
-                    <Pencil className="h-4 w-4 text-yellow-600" />
-                    Editando registro
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-4 w-4" />
-                    Agregar registro
-                  </>
-                )}
-              </Label>
-
+            <div className="space-y-3">
               <div>
-                <Label htmlFor="batch-date" className="text-xs text-gray-600">
-                  Fecha
-                </Label>
+                <Label htmlFor="hist-date" className="text-sm font-medium text-gray-700">Fecha</Label>
                 <Input
-                  id="batch-date"
+                  id="hist-date"
                   type="date"
                   max={today}
                   value={currentDate}
                   onChange={(e) => setCurrentDate(e.target.value)}
                   disabled={isSubmitting}
+                  className="mt-1"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label htmlFor="batch-in" className="text-xs text-gray-600">
-                    Entrada
-                  </Label>
+                  <Label htmlFor="hist-in" className="text-sm font-medium text-gray-700">Entrada</Label>
                   <Input
-                    id="batch-in"
+                    id="hist-in"
                     type="time"
                     value={currentClockIn}
                     onChange={(e) => setCurrentClockIn(e.target.value)}
                     disabled={isSubmitting}
+                    className="mt-1"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="batch-out" className="text-xs text-gray-600">
-                    Salida
-                  </Label>
+                  <Label htmlFor="hist-out" className="text-sm font-medium text-gray-700">Salida</Label>
                   <Input
-                    id="batch-out"
+                    id="hist-out"
                     type="time"
                     value={currentClockOut}
                     onChange={(e) => setCurrentClockOut(e.target.value)}
                     disabled={isSubmitting}
+                    className="mt-1"
                   />
                 </div>
               </div>
 
-              {/* Notes */}
+              {/* Note */}
               <div>
-                <Label htmlFor="batch-note" className="text-xs text-gray-600">
-                  Nota (opcional)
-                </Label>
+                <Label htmlFor="hist-note" className="text-sm font-medium text-gray-700">Nota (opcional)</Label>
                 <textarea
-                  id="batch-note"
+                  id="hist-note"
                   value={currentNote}
                   onChange={(e) => setCurrentNote(e.target.value)}
                   placeholder="Ej: Turno normal, sin novedades..."
-                  className="w-full min-h-[60px] p-3 border rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400 mt-1"
+                  className="w-full min-h-[50px] p-2 border rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400 mt-1"
                   disabled={isSubmitting}
                 />
               </div>
 
-              <div className="flex gap-2">
-                <Button
-                  onClick={checkConflictsAndAdd}
-                  disabled={isSubmitting}
-                  size="sm"
-                  className={`flex-1 ${editingId ? "bg-yellow-600 hover:bg-yellow-700" : "bg-blue-600 hover:bg-blue-700"}`}
-                >
-                  {editingId ? (
-                    <>
-                      <Pencil className="h-4 w-4 mr-1" />
-                      Guardar cambio
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="h-4 w-4 mr-1" />
-                      Agregar a la lista
-                    </>
-                  )}
-                </Button>
-                {editingId && (
-                  <Button
-                    onClick={cancelEdit}
-                    size="sm"
-                    variant="outline"
-                    disabled={isSubmitting}
-                  >
-                    Cancelar
-                  </Button>
+              {/* Expenses/Income section */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                  <Receipt className="h-4 w-4" />
+                  Gastos o ingresos (opcional)
+                </Label>
+
+                {expenses.length > 0 && (
+                  <div className="space-y-1">
+                    {expenses.map((exp, idx) => (
+                      <div key={idx} className={`flex items-center justify-between rounded px-2 py-1 text-sm ${exp.type === "expense" ? "bg-red-50" : "bg-green-50"}`}>
+                        <div className="flex items-center gap-1.5">
+                          {exp.type === "expense"
+                            ? <ArrowUpCircle className="h-3.5 w-3.5 text-red-500" />
+                            : <ArrowDownCircle className="h-3.5 w-3.5 text-green-500" />}
+                          <span className="truncate">{exp.description}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`font-medium ${exp.type === "expense" ? "text-red-700" : "text-green-700"}`}>
+                            ${parseFloat(exp.amount).toLocaleString()}
+                          </span>
+                          <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => removeExpense(idx)}>
+                            <Trash2 className="h-3 w-3 text-gray-400" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
-                {!editingId && entries.length > 0 && (
-                  <Button
-                    onClick={duplicateLastTimes}
-                    disabled={isSubmitting}
-                    size="sm"
-                    variant="outline"
-                    title="Usar mismas horas del último registro"
-                  >
-                    <Copy className="h-4 w-4" />
+
+                <div className="flex gap-1.5 items-end">
+                  <Select value={newExpenseType} onValueChange={(v) => setNewExpenseType(v as "expense" | "income")}>
+                    <SelectTrigger className="w-[90px] h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="expense">Gasto</SelectItem>
+                      <SelectItem value="income">Ingreso</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number"
+                    placeholder="Monto"
+                    value={newExpenseAmount}
+                    onChange={(e) => setNewExpenseAmount(e.target.value)}
+                    className="h-8 w-20 text-xs"
+                    min="0"
+                  />
+                  <Input
+                    placeholder="Descripción"
+                    value={newExpenseDesc}
+                    onChange={(e) => setNewExpenseDesc(e.target.value)}
+                    className="h-8 flex-1 text-xs"
+                  />
+                  <Button size="sm" variant="outline" className="h-8 px-2" onClick={handleAddExpense}
+                    disabled={!newExpenseDesc.trim() || !newExpenseAmount || parseFloat(newExpenseAmount) <= 0}>
+                    <Plus className="h-3.5 w-3.5" />
                   </Button>
-                )}
+                </div>
               </div>
             </div>
 
+            {/* Error */}
             {error && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
@@ -592,127 +514,125 @@ export function BatchHistoricalDialog({
               </Alert>
             )}
 
-            {/* Pending entries list */}
-            {entries.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">
-                    Registros ({entries.length})
-                  </Label>
-                  <span className="text-xs text-gray-500">
-                    Total: {totalDuration}
-                  </span>
+            {/* Success */}
+            {successMsg && (
+              <Alert className="border-green-200 bg-green-50">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-800">{successMsg}</AlertDescription>
+              </Alert>
+            )}
+
+            {/* Action button — single mode */}
+            {!batchMode && (
+              <Button
+                onClick={checkConflictsAndSubmit}
+                disabled={isSubmitting || !selectedPerson}
+                className="w-full h-12 text-base bg-blue-600 hover:bg-blue-700"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                ) : (
+                  <Check className="h-5 w-5 mr-2" />
+                )}
+                {isSubmitting ? "Guardando..." : "Guardar Registro"}
+              </Button>
+            )}
+
+            {/* Batch mode — add to list + list + send */}
+            {batchMode && (
+              <>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={checkConflictsAndSubmit}
+                    disabled={isSubmitting}
+                    size="sm"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Agregar a la lista
+                  </Button>
+                  {entries.length > 0 && (
+                    <Button
+                      onClick={() => {
+                        if (entries.length > 0) {
+                          const last = entries[entries.length - 1];
+                          setCurrentClockIn(last.clockInTime);
+                          setCurrentClockOut(last.clockOutTime);
+                        }
+                      }}
+                      size="sm"
+                      variant="outline"
+                      title="Copiar horas del último"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
 
-                <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                  {entries.map((entry) => (
-                    <div
-                      key={entry.id}
-                      className={`flex items-center justify-between p-2 rounded-lg text-sm ${
-                        editingId === entry.id
-                          ? "bg-yellow-100 border-2 border-yellow-400"
-                          : entry.status === "success"
-                            ? "bg-green-50 border border-green-200"
-                            : entry.status === "error"
-                              ? "bg-red-50 border border-red-200"
-                              : entry.status === "sending"
-                                ? "bg-blue-50 border border-blue-200"
-                                : "bg-white border"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        {entry.status === "success" && (
-                          <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-                        )}
-                        {entry.status === "error" && (
-                          <XCircle className="h-4 w-4 text-red-600 shrink-0" />
-                        )}
-                        {entry.status === "sending" && (
-                          <Loader2 className="h-4 w-4 text-blue-600 animate-spin shrink-0" />
-                        )}
-                        <span className="font-medium capitalize truncate">
-                          {getDayName(entry.date)}
-                        </span>
-                        <span className="text-gray-500 shrink-0">
-                          {entry.clockInTime} → {entry.clockOutTime}
-                        </span>
-                        <Badge
-                          variant="secondary"
-                          className="text-[10px] shrink-0"
+                {entries.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">Registros ({entries.length})</Label>
+                    </div>
+                    <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                      {entries.map((entry) => (
+                        <div
+                          key={entry.id}
+                          className={`flex items-center justify-between p-2 rounded-lg text-sm ${
+                            entry.status === "success" ? "bg-green-50 border border-green-200"
+                            : entry.status === "error" ? "bg-red-50 border border-red-200"
+                            : entry.status === "sending" ? "bg-blue-50 border border-blue-200"
+                            : "bg-white border"
+                          }`}
                         >
-                          {getEntryDuration(
-                            entry.clockInTime,
-                            entry.clockOutTime
-                          )}
-                        </Badge>
-                      </div>
-
-                      <div className="flex items-center gap-1 shrink-0">
-                        {canEditEntry(entry) && !isSubmitting && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 text-gray-400 hover:text-blue-600"
-                            onClick={() => startEdit(entry)}
-                            title="Editar"
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                        )}
-                        {(entry.status === "pending" || (isAdmin && entry.status !== "sending")) &&
-                          !isSubmitting && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0 text-gray-400 hover:text-red-600"
-                              onClick={() => removeEntry(entry.id)}
-                              title="Eliminar"
-                            >
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            {entry.status === "success" && <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />}
+                            {entry.status === "error" && <XCircle className="h-4 w-4 text-red-600 shrink-0" />}
+                            {entry.status === "sending" && <Loader2 className="h-4 w-4 text-blue-600 animate-spin shrink-0" />}
+                            <span className="font-medium capitalize truncate">{getDayName(entry.date)}</span>
+                            <span className="text-gray-500 shrink-0">{entry.clockInTime} → {entry.clockOutTime}</span>
+                            <Badge variant="secondary" className="text-[10px] shrink-0">
+                              {getEntryDuration(entry.clockInTime, entry.clockOutTime)}
+                            </Badge>
+                          </div>
+                          {entry.status === "pending" && !isSubmitting && (
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-gray-400 hover:text-red-600"
+                              onClick={() => setEntries((prev) => prev.filter((e) => e.id !== entry.id))}>
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           )}
-                      </div>
-
-                      {entry.status === "error" && (
-                        <span className="text-[10px] text-red-600 ml-1 truncate max-w-[120px]">
-                          {entry.errorMessage}
-                        </span>
-                      )}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-
-                {successCount > 0 && (
-                  <p className="text-xs text-green-600 text-center">
-                    {successCount} de {entries.length} registros guardados
-                  </p>
+                    {!allDone && (
+                      <Button
+                        onClick={submitBatch}
+                        disabled={pendingCount === 0 || isSubmitting || !selectedPerson}
+                        className="w-full bg-green-600 hover:bg-green-700"
+                      >
+                        {isSubmitting ? (
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4 mr-1" />
+                        )}
+                        {isSubmitting ? "Enviando..." : `Enviar ${pendingCount} registro${pendingCount !== 1 ? "s" : ""}`}
+                      </Button>
+                    )}
+                    {successCount > 0 && (
+                      <p className="text-xs text-green-600 text-center">
+                        {successCount} de {entries.length} registros guardados
+                      </p>
+                    )}
+                  </div>
                 )}
-              </div>
+              </>
             )}
           </div>
 
-          <DialogFooter className="flex-col sm:flex-row gap-2">
+          <DialogFooter>
             <Button variant="outline" onClick={handleClose}>
-              {allDone ? "Cerrar" : "Cancelar"}
+              {allDone || successMsg ? "Cerrar" : "Cancelar"}
             </Button>
-            {!allDone && (
-              <Button
-                onClick={submitAll}
-                disabled={
-                  pendingCount === 0 || isSubmitting || !selectedPerson
-                }
-                className="bg-green-600 hover:bg-green-700"
-              >
-                {isSubmitting ? (
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4 mr-1" />
-                )}
-                {isSubmitting
-                  ? "Enviando..."
-                  : `Enviar ${pendingCount} registro${pendingCount !== 1 ? "s" : ""}`}
-              </Button>
-            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -722,9 +642,9 @@ export function BatchHistoricalDialog({
         onOpenChange={setShowConflictDialog}
         conflicts={pendingConflicts}
         personName={selectedPerson}
-        onAdjust={handleConflictAdjust}
+        onAdjust={() => setShowConflictDialog(false)}
         onForceWithAlert={handleConflictForce}
-        onCancel={handleConflictCancel}
+        onCancel={() => setShowConflictDialog(false)}
       />
     </>
   );

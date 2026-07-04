@@ -25,6 +25,12 @@ try {
 
     $newStart = new DateTime($clockIn);
     $newEnd = new DateTime($clockOut);
+    $now = new DateTime('now', new DateTimeZone('America/Bogota'));
+
+    // La hora de salida debe ser anterior a la hora actual
+    if ($newEnd > $now) {
+        json_error('No se puede registrar un horario que aún no ha terminado. La hora de salida debe ser anterior a la hora actual. Si necesitas programar un turno futuro, usa la opción de Programar en la pestaña de turnos.', 400);
+    }
 
     $conflicts = [];
     for ($i = 1; $i < count($rows); $i++) {
