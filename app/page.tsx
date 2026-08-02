@@ -19,6 +19,7 @@ import { ScheduleView } from "@/components/schedule-view";
 import { AdminLoginDialog } from "@/components/admin-login-dialog";
 import { AdminAlertsPanel } from "@/components/admin-alerts-panel";
 import { AdminRecaudos } from "@/components/admin-recaudos";
+import { AdminLiquidation } from "@/components/admin-liquidation";
 import { ProfileSelector } from "@/components/profile-selector";
 import { AdminProvider, useAdmin } from "@/lib/admin-context";
 import { MarujitaIcon } from "@/components/marujita-icon";
@@ -28,17 +29,30 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { fetchPeople, fetchTimeEntries, postClockIn, postClockOut, postHistoricalEntry, fetchSchedule } from "@/lib/api-client";
+import { fetchPeople, fetchTimeEntries, postClockIn, postClockOut, postHistoricalEntry, fetchSchedule, fetchAdvances, fetchExpenses, fetchRecaudos } from "@/lib/api-client";
+import { CaregiverIncomeSummary } from "@/components/caregiver-income-summary";
 
 interface Person {
   id: string; name: string; avatar?: string; isActive: boolean;
   lastClockIn?: string; lastClockOut?: string;
+  isFixed?: boolean; fixedRate?: number | null;
 }
 interface TimeEntry {
   id: string; rowIndex: number; personName: string; clockIn: string;
   clockOut?: string; totalHours?: number; paid: boolean; date: string;
   hourlyValue?: number; notes?: string; images?: string;
   confirmedByCaregiver?: string; confirmationDate?: string; amountConfirmed?: number;
+}
+interface Advance {
+  rowIndex: number; personName: string; amount: number; date: string;
+  month: string; description: string;
+}
+interface ShiftExpense {
+  rowIndex: number; personName: string; entryRowIndex: number;
+  type: "expense" | "income"; amount: number; description: string; date: string;
+}
+interface Recaudo {
+  rowIndex: number; month: string; amount: number; description: string;
 }
 
 const PROFILE_KEY = "marujita_profile";
@@ -69,6 +83,9 @@ function ClockTrackerInner() {
   const [profileName, setProfileName] = useState<string | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [todayShifts, setTodayShifts] = useState<Array<{ date: string; personName: string; startTime: string; endTime: string }>>([]);
+  const [advances, setAdvances] = useState<Advance[]>([]);
+  const [allExpenses, setAllExpenses] = useState<ShiftExpense[]>([]);
+  const [recaudos, setRecaudos] = useState<Recaudo[]>([]);
 
   const unresolvedAlerts = alerts.filter((a) => !a.resolved).length;
 
@@ -155,7 +172,7 @@ function ClockTrackerInner() {
 
   const loadInitialData = async () => {
     setInitialLoading(true);
-    try { await Promise.all([loadPeople(), loadTimeEntries(), loadTodayShifts()]); }
+    try { await Promise.all([loadPeople(), loadTimeEntries(), loadTodayShifts(), loadFinancialData()]); }
     catch { showAlertMessage("Error al cargar los datos. Verifica la conexión."); }
     finally { setInitialLoading(false); }
   };
@@ -194,6 +211,21 @@ function ClockTrackerInner() {
       if (!data.error && Array.isArray(data)) {
         setTodayShifts(data);
       }
+    } catch {}
+  };
+
+  const loadFinancialData = async () => {
+    try {
+      const now = new Date();
+      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const [advData, expData, recData] = await Promise.all([
+        fetchAdvances(monthKey),
+        fetchExpenses(),
+        fetchRecaudos(),
+      ]);
+      if (!advData.error && Array.isArray(advData)) setAdvances(advData);
+      if (!expData.error && Array.isArray(expData)) setAllExpenses(expData);
+      if (!recData.error && Array.isArray(recData)) setRecaudos(recData);
     } catch {}
   };
 
@@ -483,6 +515,18 @@ function ClockTrackerInner() {
                     </p>
                   </CardContent>
                 </Card>
+
+                {/* Income summary for current month */}
+                {profileName && (
+                  <CaregiverIncomeSummary
+                    personName={profileName}
+                    timeEntries={timeEntries}
+                    people={people}
+                    advances={advances}
+                    expenses={allExpenses}
+                    recaudos={recaudos}
+                  />
+                )}
               </div>
             )}
 
@@ -567,6 +611,7 @@ function ClockTrackerInner() {
                     </ul>
                   </div></CardContent>
                 </Card>
+                <AdminLiquidation />
                 <AdminRecaudos />
                 <AdminAlertsPanel />
               </div>
