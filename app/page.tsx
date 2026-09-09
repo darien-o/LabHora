@@ -30,7 +30,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { fetchPeople, fetchTimeEntries, postClockIn, postClockOut, postHistoricalEntry, fetchSchedule, fetchAdvances, fetchExpenses, fetchRecaudos } from "@/lib/api-client";
-import { toColombiaISO } from "@/lib/utils";
+import { toColombiaISO, parseSpanishDateTime } from "@/lib/utils";
 import { CaregiverIncomeSummary } from "@/components/caregiver-income-summary";
 
 interface Person {
@@ -237,15 +237,6 @@ function ClockTrackerInner() {
   }, []);
 
   const getActivePerson = () => people.find((p) => p.isActive);
-
-  const parseSpanishDateTime = (s: string): Date | null => {
-    try {
-      const [d, t] = s.split(", ");
-      const [day, mo, yr] = d.split("/").map(Number);
-      const [h, m, sec] = t.split(":").map(Number);
-      return new Date(yr, mo - 1, day, h, m, sec);
-    } catch { return null; }
-  };
 
   const formatTime = (d: Date) =>
     d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hour12: false });

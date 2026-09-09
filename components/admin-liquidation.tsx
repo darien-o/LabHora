@@ -16,6 +16,7 @@ import {
   fetchPeople, fetchTimeEntries, fetchAdvances, fetchExpenses,
   fetchRecaudos, postBulkTogglePaid,
 } from "@/lib/api-client"
+import { parseSpanishDateTime } from "@/lib/utils"
 
 interface Person {
   id: string
@@ -69,16 +70,7 @@ const MONTH_NAMES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ]
 
-function parseSpanishDateTime(s: string): Date | null {
-  try {
-    const [d, t] = s.split(", ")
-    const [day, mo, yr] = d.split("/").map(Number)
-    const [h, m, sec] = t.split(":").map(Number)
-    return new Date(yr, mo - 1, day, h, m, sec || 0)
-  } catch {
-    return null
-  }
-}
+
 
 function formatHours(h: number): string {
   const hr = Math.floor(h)

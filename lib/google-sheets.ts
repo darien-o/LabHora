@@ -416,17 +416,22 @@ export async function getConflictDetails(
   }
 }
 
-// Helper function to parse Spanish formatted datetime
+// Helper function to parse Spanish formatted datetime.
+// Handles both "DD/MM/YYYY, HH:mm:ss" (app-written) and
+// "D/M/YYYY H:mm:ss" (legacy manual entries, no comma, no zero-padding).
 function parseSpanishDateTime(dateTimeStr: string): Date {
   try {
-    // Handle format: "DD/MM/YYYY, HH:mm:ss"
-    const [datePart, timePart] = dateTimeStr.split(", ")
+    // Normalize: remove the optional comma so both formats become "D/M/YYYY H:mm:ss"
+    const normalized = dateTimeStr.replace(", ", " ").trim()
+    const spaceIdx = normalized.indexOf(" ")
+    if (spaceIdx === -1) throw new Error("no space separator")
+    const datePart = normalized.slice(0, spaceIdx)
+    const timePart = normalized.slice(spaceIdx + 1)
     const [day, month, year] = datePart.split("/")
     const [hour, minute, second] = timePart.split(":")
-
     return new Date(
       Number.parseInt(year),
-      Number.parseInt(month) - 1, // Month is 0-indexed
+      Number.parseInt(month) - 1,
       Number.parseInt(day),
       Number.parseInt(hour),
       Number.parseInt(minute),

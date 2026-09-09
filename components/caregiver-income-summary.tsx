@@ -9,6 +9,7 @@ import {
   Banknote, Receipt, AlertCircle,
 } from "lucide-react"
 import { formatCOP } from "@/lib/colombian-labor"
+import { parseSpanishDateTime } from "@/lib/utils"
 
 interface TimeEntry {
   id: string
@@ -68,17 +69,6 @@ const MONTH_NAMES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ]
-
-function parseSpanishDateTime(s: string): Date | null {
-  try {
-    const [d, t] = s.split(", ")
-    const [day, mo, yr] = d.split("/").map(Number)
-    const [h, m, sec] = t.split(":").map(Number)
-    return new Date(yr, mo - 1, day, h, m, sec || 0)
-  } catch {
-    return null
-  }
-}
 
 export function CaregiverIncomeSummary({
   personName,

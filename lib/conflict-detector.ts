@@ -2,10 +2,11 @@
  * Detects time range overlaps between entries.
  * Returns conflict info for UI warnings.
  */
+import { parseSpanishDateTime } from "@/lib/utils";
 
 interface EntryForConflict {
   personName: string;
-  clockIn: string; // "DD/MM/YYYY, HH:mm:ss" format
+  clockIn: string; // "DD/MM/YYYY, HH:mm:ss" or legacy "D/M/YYYY H:mm:ss"
   clockOut?: string;
 }
 
@@ -15,24 +16,6 @@ export interface ConflictResult {
   existingStart: Date;
   existingEnd: Date;
   isActive: boolean; // entry still open (no clockOut)
-}
-
-function parseSpanishDateTime(dateTimeStr: string): Date {
-  try {
-    const [datePart, timePart] = dateTimeStr.split(", ");
-    const [day, month, year] = datePart.split("/");
-    const [hour, minute, second] = timePart.split(":");
-    return new Date(
-      Number.parseInt(year),
-      Number.parseInt(month) - 1,
-      Number.parseInt(day),
-      Number.parseInt(hour),
-      Number.parseInt(minute),
-      Number.parseInt(second || "0")
-    );
-  } catch {
-    return new Date();
-  }
 }
 
 export function detectConflicts(
@@ -47,8 +30,10 @@ export function detectConflicts(
     if (!entry.clockIn) continue;
 
     const entryStart = parseSpanishDateTime(entry.clockIn);
+    if (!entryStart) continue;
+
     const entryEnd = entry.clockOut
-      ? parseSpanishDateTime(entry.clockOut)
+      ? (parseSpanishDateTime(entry.clockOut) ?? new Date())
       : new Date();
 
     // Check overlap: newStart < entryEnd && newEnd > entryStart
@@ -67,10 +52,11 @@ export function detectConflicts(
 }
 
 export function formatConflictMessage(conflict: ConflictResult): string {
-  const startStr = conflict.existingStart.toLocaleDateString("es-ES", {
-    day: "2-digit",
-    month: "short",
-  }) +
+  const startStr =
+    conflict.existingStart.toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "short",
+    }) +
     " " +
     conflict.existingStart.toLocaleTimeString("es-ES", {
       hour: "2-digit",

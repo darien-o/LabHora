@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
@@ -25,6 +25,7 @@ import { calculatePaySummary, formatCOP, type PaySummary } from "@/lib/colombian
 import { fetchPeople, fetchTimeEntries, postTogglePaid, postEditEntry, postDeleteEntry, fetchRecaudos, postBulkTogglePaid, fetchAdvances, postAdvance, fetchExpenses } from "@/lib/api-client"
 import { useAdmin } from "@/lib/admin-context"
 import { calculateSettlement } from "@/lib/settlement-utils"
+import { parseSpanishDateTime } from "@/lib/utils"
 import { CollapsibleFilters } from "@/components/collapsible-filters"
 import { ImageViewerModal } from "@/components/image-viewer-modal"
 import { BulkPaymentBar } from "@/components/bulk-payment-bar"
@@ -151,15 +152,6 @@ export function HistoryView({ timeEntries, people, onRefresh, currentPersonName 
   // Load advances when month changes
   useEffect(() => { loadAdvances(); loadAllExpenses() }, [selectedMonth, selectedYear])
 
-  const parseSpanishDateTime = useCallback((s: string): Date => {
-    try {
-      const [d, t] = s.split(", ")
-      const [day, mo, yr] = d.split("/")
-      const [h, m, sec] = t.split(":")
-      return new Date(+yr, +mo - 1, +day, +h, +m, +(sec || "0"))
-    } catch { return new Date() }
-  }, [])
-
   const personFiltered = useMemo(() => {
     if (selectedPerson === "all") return localEntries
     return localEntries.filter((e) => e.personName === selectedPerson)
@@ -168,20 +160,27 @@ export function HistoryView({ timeEntries, people, onRefresh, currentPersonName 
   const filteredEntries = useMemo(() => {
     return personFiltered.filter((entry) => {
       const d = parseSpanishDateTime(entry.clockIn)
+      if (!d) return true // keep unparseable entries visible rather than hiding them
       if (dateFilterMode === "month") return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear
       if (dateFilterMode === "range" && rangeFrom && rangeTo) {
         return d >= new Date(rangeFrom + "T00:00:00") && d <= new Date(rangeTo + "T23:59:59")
       }
       return true
     })
-  }, [personFiltered, dateFilterMode, selectedMonth, selectedYear, rangeFrom, rangeTo, parseSpanishDateTime])
+  }, [personFiltered, dateFilterMode, selectedMonth, selectedYear, rangeFrom, rangeTo])
 
   const totalHours = useMemo(() => filteredEntries.reduce((t, e) => t + (e.totalHours || 0), 0), [filteredEntries])
 
   const paySummary: PaySummary | null = useMemo(() => {
     if (selectedPerson === "all") return null
-    const completed = filteredEntries.filter((e) => e.clockIn && e.clockOut)
-      .map((e) => ({ clockIn: parseSpanishDateTime(e.clockIn), clockOut: parseSpanishDateTime(e.clockOut!) }))
+    const completed = filteredEntries
+      .filter((e) => e.clockIn && e.clockOut)
+      .map((e) => {
+        const clockIn = parseSpanishDateTime(e.clockIn)
+        const clockOut = parseSpanishDateTime(e.clockOut!)
+        return clockIn && clockOut ? { clockIn, clockOut } : null
+      })
+      .filter((e): e is { clockIn: Date; clockOut: Date } => e !== null)
     if (!completed.length) return null
     return calculatePaySummary(completed)
   }, [filteredEntries, selectedPerson, parseSpanishDateTime])
