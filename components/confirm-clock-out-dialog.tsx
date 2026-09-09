@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { AlertTriangle, Clock, Check, Pencil } from "lucide-react"
+import { toColombiaISO } from "@/lib/utils"
 
 interface Person {
   id: string
@@ -41,7 +42,7 @@ export function ConfirmClockOutDialog({ open, onOpenChange, person, onConfirm }:
 
   const handleConfirmCustom = () => {
     if (!customDate || !customTime) return
-    const ts = new Date(`${customDate}T${customTime}`).toISOString()
+    const ts = toColombiaISO(customDate, customTime)
     onConfirm(ts)
     handleClose()
   }

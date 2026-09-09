@@ -30,6 +30,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { fetchPeople, fetchTimeEntries, postClockIn, postClockOut, postHistoricalEntry, fetchSchedule, fetchAdvances, fetchExpenses, fetchRecaudos } from "@/lib/api-client";
+import { toColombiaISO } from "@/lib/utils";
 import { CaregiverIncomeSummary } from "@/components/caregiver-income-summary";
 
 interface Person {
@@ -288,10 +289,8 @@ function ClockTrackerInner() {
     setLoading(true);
     try {
       // Build the shift start time as the clock-in timestamp
-      const [y, mo, d] = date.split("-").map(Number);
-      const [h, m] = startTime.split(":").map(Number);
-      const shiftStart = new Date(y, mo - 1, d, h, m, 0, 0);
-      await postClockIn(selectedPerson.name, shiftStart.toISOString());
+      const shiftStart = toColombiaISO(date, startTime);
+      await postClockIn(selectedPerson.name, shiftStart);
       await refreshData();
       showAlertMessage(`¡Turno confirmado! Entrada registrada para ${selectedPerson.name}.`);
     } catch (error: any) {

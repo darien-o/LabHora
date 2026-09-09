@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar, Clock, AlertTriangle } from "lucide-react";
+import { toColombiaISO } from "@/lib/utils";
 
 interface Person {
   id: string;
@@ -158,7 +159,7 @@ export function HistoricalEntryDialog({
       return;
     }
 
-    onConfirm(clockInDateTime.toISOString(), clockOutDateTime.toISOString());
+    onConfirm(toColombiaISO(clockInDate, clockInTime), toColombiaISO(clockInDate, clockOutTime));
     // Only close the dialog on successful validation and confirmation
     handleClose();
   }

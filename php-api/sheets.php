@@ -99,11 +99,28 @@ function format_datetime_for_sheet(string $isoTimestamp): string {
 }
 
 function parse_spanish_datetime(string $dateTimeStr): DateTime {
-    $parts = explode(', ', $dateTimeStr);
+    $str = trim($dateTimeStr);
+
+    // Format 1 (canonical, written by app): "DD/MM/YYYY, HH:mm:ss"
+    // Format 2 (legacy, no comma, no zero-padding): "D/M/YYYY H:mm:ss"
+    // Normalize: remove the optional comma so both become "DD/MM/YYYY HH:mm:ss"
+    $normalized = str_replace(', ', ' ', $str);
+
+    // Split on the space between date and time parts
+    $parts = explode(' ', $normalized, 2);
     if (count($parts) !== 2) {
         throw new Exception("Formato de fecha inválido: $dateTimeStr");
     }
     [$datePart, $timePart] = $parts;
-    [$day, $month, $year] = explode('/', $datePart);
-    return new DateTime("$year-$month-$day $timePart", new DateTimeZone('America/Bogota'));
+
+    $datePieces = explode('/', $datePart);
+    if (count($datePieces) !== 3) {
+        throw new Exception("Formato de fecha inválido: $dateTimeStr");
+    }
+    [$day, $month, $year] = $datePieces;
+
+    return new DateTime(
+        sprintf('%04d-%02d-%02d %s', (int)$year, (int)$month, (int)$day, $timePart),
+        new DateTimeZone('America/Bogota')
+    );
 }

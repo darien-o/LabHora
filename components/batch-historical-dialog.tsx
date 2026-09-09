@@ -44,6 +44,7 @@ import { detectConflicts, type ConflictResult } from "@/lib/conflict-detector";
 import { useAdmin } from "@/lib/admin-context";
 import { getNextCalendarDay } from "@/lib/schedule-utils";
 import { postExpense } from "@/lib/api-client";
+import { toColombiaISO } from "@/lib/utils";
 
 interface Person {
   id: string;
@@ -241,8 +242,8 @@ export function BatchHistoricalDialog({
   const doSubmitSingle = async () => {
     setIsSubmitting(true);
     try {
-      const clockIn = new Date(`${currentDate}T${currentClockIn}`).toISOString();
-      const clockOut = new Date(`${currentDate}T${currentClockOut}`).toISOString();
+      const clockIn = toColombiaISO(currentDate, currentClockIn);
+      const clockOut = toColombiaISO(currentDate, currentClockOut);
       await onSubmitEntry(selectedPerson, clockIn, clockOut);
 
       // TODO: If expenses exist, we'd need the rowIndex of the created entry to associate them.
@@ -273,8 +274,8 @@ export function BatchHistoricalDialog({
     for (const entry of pendingEntries) {
       setEntries((prev) => prev.map((e) => e.id === entry.id ? { ...e, status: "sending" as const } : e));
       try {
-        const clockIn = new Date(`${entry.date}T${entry.clockInTime}`).toISOString();
-        const clockOut = new Date(`${entry.date}T${entry.clockOutTime}`).toISOString();
+        const clockIn = toColombiaISO(entry.date, entry.clockInTime);
+        const clockOut = toColombiaISO(entry.date, entry.clockOutTime);
         await onSubmitEntry(selectedPerson, clockIn, clockOut);
         setEntries((prev) => prev.map((e) => e.id === entry.id ? { ...e, status: "success" as const } : e));
       } catch (err: any) {

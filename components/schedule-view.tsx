@@ -18,6 +18,7 @@ import {
   Ban, ShieldAlert, CalendarRange,
 } from "lucide-react"
 import { fetchSchedule, postScheduleShift, fetchBlocks, postScheduleRepeat, postHistoricalEntry, postBlock } from "@/lib/api-client"
+import { toColombiaISO } from "@/lib/utils"
 import { getWeekStartMonday, checkBlockConflicts, type ScheduleBlock } from "@/lib/schedule-utils"
 import { ShiftDayPicker } from "@/components/shift-day-picker"
 import { BlockScheduleDialog } from "@/components/block-schedule-dialog"
@@ -265,11 +266,8 @@ export function ScheduleView({ people, currentPersonName }: ScheduleViewProps) {
     setSaving(true)
     try {
       for (const record of records) {
-        const [y, mo, d] = record.date.split("-").map(Number)
-        const [sh, sm] = record.startTime.split(":").map(Number)
-        const [eh, em] = record.endTime.split(":").map(Number)
-        const clockIn = new Date(y, mo - 1, d, sh, sm, 0, 0).toISOString()
-        const clockOut = new Date(y, mo - 1, d, eh, em, 0, 0).toISOString()
+        const clockIn = toColombiaISO(record.date, record.startTime)
+        const clockOut = toColombiaISO(record.date, record.endTime)
         await postHistoricalEntry(personName, clockIn, clockOut)
       }
       setShowMultiDayDialog(false)
