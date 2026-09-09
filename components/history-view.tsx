@@ -25,7 +25,7 @@ import { calculatePaySummary, formatCOP, type PaySummary } from "@/lib/colombian
 import { fetchPeople, fetchTimeEntries, postTogglePaid, postEditEntry, postDeleteEntry, fetchRecaudos, postBulkTogglePaid, fetchAdvances, postAdvance, fetchExpenses } from "@/lib/api-client"
 import { useAdmin } from "@/lib/admin-context"
 import { calculateSettlement } from "@/lib/settlement-utils"
-import { parseSpanishDateTime } from "@/lib/utils"
+import { parseSpanishDateTime, toColombiaISO } from "@/lib/utils"
 import { CollapsibleFilters } from "@/components/collapsible-filters"
 import { ImageViewerModal } from "@/components/image-viewer-modal"
 import { BulkPaymentBar } from "@/components/bulk-payment-bar"
@@ -183,7 +183,7 @@ export function HistoryView({ timeEntries, people, onRefresh, currentPersonName 
       .filter((e): e is { clockIn: Date; clockOut: Date } => e !== null)
     if (!completed.length) return null
     return calculatePaySummary(completed)
-  }, [filteredEntries, selectedPerson, parseSpanishDateTime])
+  }, [filteredEntries, selectedPerson])
 
   const paidSummary = useMemo(() => {
     const completed = filteredEntries.filter((e) => e.clockOut)
@@ -277,10 +277,9 @@ export function HistoryView({ timeEntries, people, onRefresh, currentPersonName 
   }, [filteredEntries, selectedPerson, allExpenses, advances, customPaySummary, selectedMonth, selectedYear, isAdmin])
 
   const fmtDT = (s: string) => {
-    try {
-      const d = parseSpanishDateTime(s)
-      return { date: d.toLocaleDateString("es-ES"), time: d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) }
-    } catch { return { date: "?", time: "?" } }
+    const d = parseSpanishDateTime(s)
+    if (!d) return { date: "?", time: "?" }
+    return { date: d.toLocaleDateString("es-ES"), time: d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) }
   }
   const fmtH = (h: number) => { const hr = Math.floor(h); const m = Math.round((h - hr) * 60); return `${hr}h ${m}m` }
 
@@ -300,6 +299,7 @@ export function HistoryView({ timeEntries, people, onRefresh, currentPersonName 
     // Regular user: only own entries from today or yesterday
     if (entry.personName !== currentPersonName) return false
     const entryDate = parseSpanishDateTime(entry.clockIn)
+    if (!entryDate) return false
     const today = new Date(); today.setHours(0, 0, 0, 0)
     const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1)
     const entryDay = new Date(entryDate); entryDay.setHours(0, 0, 0, 0)
@@ -309,6 +309,7 @@ export function HistoryView({ timeEntries, people, onRefresh, currentPersonName 
   const openEdit = (entry: TimeEntry) => {
     const cin = parseSpanishDateTime(entry.clockIn)
     const cout = entry.clockOut ? parseSpanishDateTime(entry.clockOut) : new Date()
+    if (!cin || !cout) return
     const pad = (n: number) => String(n).padStart(2, "0")
     setEditEntry(entry)
     setEditDate(`${cin.getFullYear()}-${pad(cin.getMonth() + 1)}-${pad(cin.getDate())}`)
@@ -319,12 +320,12 @@ export function HistoryView({ timeEntries, people, onRefresh, currentPersonName 
 
   const handleEditSave = async () => {
     if (!editEntry || !editDate || !editClockIn || !editClockOut) return
-    const cin = new Date(`${editDate}T${editClockIn}`)
-    const cout = new Date(`${editDate}T${editClockOut}`)
-    if (cin >= cout) { setEditError("La hora de salida debe ser posterior a la de entrada."); return }
+    const cinISO = toColombiaISO(editDate, editClockIn)
+    const coutISO = toColombiaISO(editDate, editClockOut)
+    if (cinISO >= coutISO) { setEditError("La hora de salida debe ser posterior a la de entrada."); return }
     setEditSaving(true); setEditError("")
     try {
-      await postEditEntry(editEntry.rowIndex, cin.toISOString(), cout.toISOString())
+      await postEditEntry(editEntry.rowIndex, cinISO, coutISO)
       setEditEntry(null)
       await loadFreshData()
       await onRefresh()
