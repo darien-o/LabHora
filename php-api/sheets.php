@@ -92,9 +92,15 @@ function get_json_body(): array {
     return $data;
 }
 
-function format_datetime_for_sheet(string $isoTimestamp): string {
+function format_datetime_for_sheet(string $isoTimestamp, string $timezone = 'America/Bogota'): string {
+    // Validate timezone; fall back to Bogota if the client sends an unknown one
+    try {
+        $tz = new DateTimeZone($timezone);
+    } catch (Exception $e) {
+        $tz = new DateTimeZone('America/Bogota');
+    }
     $dt = new DateTime($isoTimestamp);
-    $dt->setTimezone(new DateTimeZone('America/Bogota'));
+    $dt->setTimezone($tz);
     return $dt->format('d/m/Y, H:i:s');
 }
 

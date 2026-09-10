@@ -12,6 +12,7 @@ try {
     $data = get_json_body();
     $action = $data['action'] ?? '';
     $rowIndex = $data['rowIndex'] ?? 0;
+    $timezone = $data['timezone'] ?? 'America/Bogota';
 
     if (!$rowIndex) {
         json_error('Falta rowIndex', 400);
@@ -28,8 +29,8 @@ try {
             json_error('Faltan clockIn o clockOut', 400);
         }
 
-        $clockInFormatted = format_datetime_for_sheet($clockIn);
-        $clockOutFormatted = format_datetime_for_sheet($clockOut);
+        $clockInFormatted = format_datetime_for_sheet($clockIn, $timezone);
+        $clockOutFormatted = format_datetime_for_sheet($clockOut, $timezone);
 
         $newStart = new DateTime($clockIn);
         $newEnd = new DateTime($clockOut);

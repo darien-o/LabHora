@@ -11,6 +11,7 @@ try {
     $personName = $data['personName'] ?? '';
     $clockIn = $data['clockIn'] ?? '';
     $clockOut = $data['clockOut'] ?? '';
+    $timezone = $data['timezone'] ?? 'America/Bogota';
 
     if (!$personName || !$clockIn || !$clockOut) {
         json_error('Faltan datos requeridos', 400);
@@ -63,8 +64,8 @@ try {
         }
     }
 
-    $clockInFormatted = format_datetime_for_sheet($clockIn);
-    $clockOutFormatted = format_datetime_for_sheet($clockOut);
+    $clockInFormatted = format_datetime_for_sheet($clockIn, $timezone);
+    $clockOutFormatted = format_datetime_for_sheet($clockOut, $timezone);
 
     $diffSeconds = $newEnd->getTimestamp() - $newStart->getTimestamp();
     $totalHours = round($diffSeconds / 3600, 2);

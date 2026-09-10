@@ -6,33 +6,41 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Build an ISO 8601 timestamp from a date string ("YYYY-MM-DD") and a time
- * string ("HH:mm" or "HH:mm:ss") interpreted as Colombia time
- * (America/Bogota, UTC-5), regardless of the device's local timezone.
+ * Build an ISO 8601 (UTC) timestamp from a user-picked date ("YYYY-MM-DD")
+ * and time ("HH:mm" or "HH:mm:ss"), treating them as the device's local time.
  *
- * Always use this instead of `new Date(`${date}T${time}`).toISOString()`
- * when the user has manually picked a date and time.
+ * This is intentionally timezone-agnostic on the client side: wherever the
+ * device is, the wall-clock time the user typed is what gets submitted.
+ * The PHP server converts the UTC value to Colombia time for display in the
+ * sheet ("DD/MM/YYYY, HH:mm:ss"), so the stored format stays consistent
+ * regardless of where the user is located.
  */
-export function toColombiaISO(dateStr: string, timeStr: string): string {
-  // Append seconds if not present so the Date constructor is unambiguous
+export function toLocalISO(dateStr: string, timeStr: string): string {
   const time = timeStr.length === 5 ? `${timeStr}:00` : timeStr
-  // Colombia is UTC-5 year-round (no daylight saving time)
-  return new Date(`${dateStr}T${time}-05:00`).toISOString()
+  return new Date(`${dateStr}T${time}`).toISOString()
 }
 
 /**
- * Parse a date string from Google Sheets into a JavaScript Date (local time).
+ * @deprecated Renamed to toLocalISO. Kept as alias while callers are migrated.
+ */
+export const toColombiaISO = toLocalISO
+
+/**
+ * Parse a Google Sheets date string into a JavaScript Date.
  *
- * Handles both formats stored in the sheet:
- *   - New (app-written):  "DD/MM/YYYY, HH:mm:ss"  (comma + space separator)
- *   - Legacy (manual):    "D/M/YYYY H:mm:ss"       (space only, no zero-padding)
+ * Handles both formats that exist in the sheet:
+ *   - Canonical (app-written):  "DD/MM/YYYY, HH:mm:ss"
+ *   - Legacy (manual entries):  "D/M/YYYY H:mm:ss"  (no comma, no zero-padding)
  *
- * Returns null on parse failure so callers can handle it explicitly.
+ * The value is constructed as a local-time Date (same numbers the user sees),
+ * which is correct for display, same-day comparisons, and filter logic.
+ *
+ * Returns null on any parse failure — callers must check before using the result.
  */
 export function parseSpanishDateTime(s: string): Date | null {
   if (!s || typeof s !== "string") return null
   try {
-    // Normalize: remove the optional comma so both formats become "D/M/YYYY H:mm:ss"
+    // Strip the optional comma so both variants become "D/M/YYYY H:mm:ss"
     const normalized = s.replace(", ", " ").trim()
     const spaceIdx = normalized.indexOf(" ")
     if (spaceIdx === -1) return null

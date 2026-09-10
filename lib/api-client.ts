@@ -29,6 +29,19 @@ const JSON_HEADERS: HeadersInit = {
   "Content-Type": "application/json",
 }
 
+/**
+ * Returns the IANA timezone of the current device (e.g. "America/Bogota",
+ * "Europe/Madrid"). Falls back to "America/Bogota" if the browser doesn't
+ * support the Intl API (very old browsers).
+ */
+function getDeviceTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone
+  } catch {
+    return "America/Bogota"
+  }
+}
+
 // --- GET endpoints ---
 
 export async function fetchPeople() {
@@ -53,7 +66,7 @@ export async function postClockIn(personName: string, timestamp: string) {
   const res = await fetch(url("clock-in"), {
     method: "POST",
     headers: JSON_HEADERS,
-    body: JSON.stringify({ personName, timestamp }),
+    body: JSON.stringify({ personName, timestamp, timezone: getDeviceTimezone() }),
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "Error al registrar entrada")
@@ -64,7 +77,7 @@ export async function postClockOut(personName: string, timestamp: string) {
   const res = await fetch(url("clock-out"), {
     method: "POST",
     headers: JSON_HEADERS,
-    body: JSON.stringify({ personName, timestamp }),
+    body: JSON.stringify({ personName, timestamp, timezone: getDeviceTimezone() }),
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "Error al registrar salida")
@@ -75,7 +88,7 @@ export async function postHistoricalEntry(personName: string, clockIn: string, c
   const res = await fetch(url("historical-entry"), {
     method: "POST",
     headers: JSON_HEADERS,
-    body: JSON.stringify({ personName, clockIn, clockOut }),
+    body: JSON.stringify({ personName, clockIn, clockOut, timezone: getDeviceTimezone() }),
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "Error al agregar entrada histórica")
@@ -144,7 +157,7 @@ export async function postEditEntry(rowIndex: number, clockIn: string, clockOut:
   const res = await fetch(url("edit-entry"), {
     method: "POST",
     headers: JSON_HEADERS,
-    body: JSON.stringify({ action: "edit", rowIndex, clockIn, clockOut }),
+    body: JSON.stringify({ action: "edit", rowIndex, clockIn, clockOut, timezone: getDeviceTimezone() }),
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || "Error al editar registro")

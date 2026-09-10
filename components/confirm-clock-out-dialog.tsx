@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { AlertTriangle, Clock, Check, Pencil } from "lucide-react"
-import { toColombiaISO } from "@/lib/utils"
+import { toLocalISO, parseSpanishDateTime } from "@/lib/utils"
 
 interface Person {
   id: string
@@ -31,7 +31,8 @@ export function ConfirmClockOutDialog({ open, onOpenChange, person, onConfirm }:
 
   const calculateHours = () => {
     if (!person?.lastClockIn) return 0
-    const clockIn = new Date(person.lastClockIn)
+    const clockIn = parseSpanishDateTime(person.lastClockIn)
+    if (!clockIn) return 0
     return Math.round(((new Date().getTime() - clockIn.getTime()) / (1000 * 60 * 60)) * 10) / 10
   }
 
@@ -42,7 +43,7 @@ export function ConfirmClockOutDialog({ open, onOpenChange, person, onConfirm }:
 
   const handleConfirmCustom = () => {
     if (!customDate || !customTime) return
-    const ts = toColombiaISO(customDate, customTime)
+    const ts = toLocalISO(customDate, customTime)
     onConfirm(ts)
     handleClose()
   }
@@ -76,7 +77,7 @@ export function ConfirmClockOutDialog({ open, onOpenChange, person, onConfirm }:
               <span className="text-base font-semibold text-orange-900">Resumen del turno</span>
             </div>
             <p className="text-base text-orange-800">
-              Entrada: {person?.lastClockIn ? new Date(person.lastClockIn).toLocaleString("es-ES") : "?"}
+              Entrada: {person?.lastClockIn ? (parseSpanishDateTime(person.lastClockIn)?.toLocaleString("es-ES") ?? "?") : "?"}
             </p>
             <p className="text-lg font-bold text-orange-900 mt-1">
               Duración: {hours} horas

@@ -221,6 +221,7 @@ export function HistoryView({ timeEntries, people, onRefresh, currentPersonName 
     const allMonthEntries = localEntries.filter((e) => {
       if (!e.clockIn || !e.clockOut || !e.totalHours) return false
       const d = parseSpanishDateTime(e.clockIn)
+      if (!d) return false
       return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear
     })
 
@@ -243,7 +244,7 @@ export function HistoryView({ timeEntries, people, onRefresh, currentPersonName 
       fixedCost: Math.round(fixedCost), remaining: Math.round(remaining),
       variableHours: Math.round(variableHours * 100) / 100,
     }
-  }, [filteredEntries, selectedPerson, localPeople, localEntries, recaudos, selectedMonth, selectedYear, isAdmin, parseSpanishDateTime])
+  }, [filteredEntries, selectedPerson, localPeople, localEntries, recaudos, selectedMonth, selectedYear, isAdmin])
 
   // Settlement calculation including expenses and advances
   const settlementSummary = useMemo(() => {
@@ -421,9 +422,12 @@ export function HistoryView({ timeEntries, people, onRefresh, currentPersonName 
 
   const sortedEntries = useMemo(() => {
     return [...filteredEntries].sort((a, b) => {
-      try { return parseSpanishDateTime(b.clockIn).getTime() - parseSpanishDateTime(a.clockIn).getTime() } catch { return 0 }
+      const da = parseSpanishDateTime(b.clockIn)
+      const db = parseSpanishDateTime(a.clockIn)
+      if (!da || !db) return 0
+      return da.getTime() - db.getTime()
     })
-  }, [filteredEntries, parseSpanishDateTime])
+  }, [filteredEntries])
 
   return (
     <div className="space-y-3">

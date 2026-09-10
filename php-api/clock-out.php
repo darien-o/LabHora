@@ -10,6 +10,7 @@ try {
     $data = get_json_body();
     $personName = $data['personName'] ?? '';
     $timestamp = $data['timestamp'] ?? '';
+    $timezone = $data['timezone'] ?? 'America/Bogota';
 
     if (!$personName || !$timestamp) {
         json_error('Faltan datos requeridos', 400);
@@ -37,7 +38,7 @@ try {
         json_error("No se encontró registro de entrada activo para $personName", 400);
     }
 
-    $formatted = format_datetime_for_sheet($timestamp);
+    $formatted = format_datetime_for_sheet($timestamp, $timezone);
 
     // Calcular horas totales
     $clockInDt = parse_spanish_datetime($clockInTime);
