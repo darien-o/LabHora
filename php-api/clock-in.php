@@ -40,8 +40,12 @@ try {
 
         // Check for overlap with completed entries of the same person
         if ($r[2] === $personName && !empty($r[1])) {
-            $entryStart = parse_spanish_datetime($r[0]);
-            $entryEnd = parse_spanish_datetime($r[1]);
+            try {
+                $entryStart = parse_spanish_datetime($r[0]);
+                $entryEnd = parse_spanish_datetime($r[1]);
+            } catch (Exception $e) {
+                continue; // Skip rows with unparseable dates instead of failing the whole request
+            }
 
             // If the clock-in time falls within an existing completed entry, block it
             if ($clockInTime >= $entryStart && $clockInTime < $entryEnd) {

@@ -38,8 +38,12 @@ try {
         $r = $rows[$i];
         if (empty($r[0]) || empty($r[2])) continue;
 
-        $entryStart = parse_spanish_datetime($r[0]);
-        $entryEnd = !empty($r[1]) ? parse_spanish_datetime($r[1]) : new DateTime();
+        try {
+            $entryStart = parse_spanish_datetime($r[0]);
+            $entryEnd = !empty($r[1]) ? parse_spanish_datetime($r[1]) : new DateTime();
+        } catch (Exception $e) {
+            continue; // Skip rows with unparseable dates instead of failing the whole request
+        }
 
         if ($newStart < $entryEnd && $newEnd > $entryStart) {
             $startStr = $entryStart->format('d/m/Y H:i');

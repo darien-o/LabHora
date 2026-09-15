@@ -107,6 +107,18 @@ function format_datetime_for_sheet(string $isoTimestamp, string $timezone = 'Ame
 function parse_spanish_datetime(string $dateTimeStr): DateTime {
     $str = trim($dateTimeStr);
 
+    // Google Sheets occasionally returns a raw serial-date number (e.g. "46365.25")
+    // instead of formatted text, if a cell's number format ever gets reset to
+    // Number/Automatic. That serial is days since 1899-12-30 (+ fraction of a day).
+    // Convert it back to a Bogota wall-clock DateTime instead of failing outright.
+    if (is_numeric($str)) {
+        $days = (int)floor((float)$str);
+        $secondsOfDay = (int)round(((float)$str - $days) * 86400);
+        $dt = new DateTime('1899-12-30', new DateTimeZone('America/Bogota'));
+        $dt->modify("+$days days +$secondsOfDay seconds");
+        return $dt;
+    }
+
     // Format 1 (canonical, written by app): "DD/MM/YYYY, HH:mm:ss"
     // Format 2 (legacy, no comma, no zero-padding): "D/M/YYYY H:mm:ss"
     // Normalize: remove the optional comma so both become "DD/MM/YYYY HH:mm:ss"
