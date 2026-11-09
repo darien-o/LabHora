@@ -131,7 +131,7 @@ try {
 
     $entry = $entryRows[0];
     $personName = trim($entry[2] ?? '');
-    $totalHours = (float)($entry[3] ?? 0);
+    $totalHours = (float)str_replace(',', '.', (string)($entry[3] ?? 0));
     $clockInRaw = $entry[0] ?? '';
 
     $entryMonth = '';
@@ -193,7 +193,7 @@ try {
                 if (empty($r[0]) || empty($r[1]) || empty($r[2])) continue;
 
                 $rName = trim($r[2]);
-                $rHours = (float)($r[3] ?? 0);
+                $rHours = (float)str_replace(',', '.', (string)($r[3] ?? 0));
 
                 try {
                     $rDt = parse_spanish_datetime($r[0]);

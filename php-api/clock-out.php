@@ -46,6 +46,28 @@ try {
     $diffSeconds = $clockOutDt->getTimestamp() - $clockInDt->getTimestamp();
     $totalHours = round($diffSeconds / 3600, 2);
 
+    // Verificación defensiva: si el total de horas es negativo o anormalmente alto (> 72 horas),
+    // verificar si el día y el mes de entrada fueron invertidos (por ejemplo, discrepancia de locale en Google Sheets)
+    if ($diffSeconds < 0 || $totalHours > 72) {
+        $d = (int)$clockInDt->format('d');
+        $m = (int)$clockInDt->format('m');
+        $y = (int)$clockInDt->format('Y');
+        $timePart = $clockInDt->format('H:i:s');
+        if ($d <= 12 && $m <= 12 && checkdate($d, $m, $y)) {
+            $swappedDt = new DateTime(
+                sprintf('%04d-%02d-%02d %s', $y, $d, $m, $timePart),
+                $clockInDt->getTimezone()
+            );
+            $swappedDiff = $clockOutDt->getTimestamp() - $swappedDt->getTimestamp();
+            $swappedHours = round($swappedDiff / 3600, 2);
+            if ($swappedHours >= 0 && $swappedHours <= 72) {
+                $clockInDt = $swappedDt;
+                $diffSeconds = $swappedDiff;
+                $totalHours = $swappedHours;
+            }
+        }
+    }
+
     $rowNumber = $lastRowIndex + 1;
     $body = new Google\Service\Sheets\ValueRange();
     $body->setValues([[$formatted, $personName, number_format($totalHours, 2, '.', '')]]);

@@ -21,7 +21,7 @@ try {
         $dateTimeIn = $row[0];
         $dateTimeOut = !empty($row[1]) ? $row[1] : null;
         $personName = $row[2];
-        $totalHours = !empty($row[3]) ? (float)$row[3] : null;
+        $totalHours = !empty($row[3]) ? (float)str_replace(',', '.', (string)$row[3]) : null;
         $paidRaw = strtolower(trim($row[4] ?? ''));
         $paid = ($paidRaw === 'sí' || $paidRaw === 'si');
         $hourlyValue = !empty($row[5]) ? (float)preg_replace('/[^0-9.]/', '', str_replace(',', '', $row[5])) : null;
